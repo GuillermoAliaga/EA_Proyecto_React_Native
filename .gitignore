@@ -1,8 +1,12 @@
 # Dependencias y compilado
 node_modules
 dist
+web-build
 *.local
 *.tsbuildinfo
+.expo
+expo-env.d.ts
+coverage
 
 # Logs
 logs
