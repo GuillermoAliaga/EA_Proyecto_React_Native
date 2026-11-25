@@ -42,6 +42,11 @@ La persistencia real de cookies al cerrar la app y el ciclo login → cierre for
 probarse en dispositivos/emuladores iOS y Android contra el backend. No se pueden confirmar desde
 la compilación local.
 
+La autenticación restaura la sesión con `POST /auth/refresh` y `GET /users/me`. El inicio de sesión
+usa `POST /auth/login`; el registro envía únicamente nombre, correo y contraseña a
+`POST /auth/register`. El cierre llama a `POST /auth/logout` y limpia siempre la sesión local.
+El modelo de respuesta debe incluir el usuario en login o exponerlo mediante `/users/me`.
+
 ## Estructura
 
 ```text
@@ -69,7 +74,8 @@ src/
 ```
 
 `src/components/ui` contiene los controles visuales nativos; `src/models` define los tipos de la API.
-El registro y las pantallas de dominio siguen siendo marcadores para las siguientes fases.
+Registro e inicio de sesión están implementados. Home, chat, actividades y denuncias permanecen como
+marcadores para las siguientes fases; la navegación admin incluye accesos a usuarios y revisión.
 
 ## Validación
 

@@ -1,18 +1,15 @@
-import { Redirect } from 'expo-router';
 import { Header } from '../../../src/components/layout/Header';
 import { ScreenWrapper } from '../../../src/components/layout/ScreenWrapper';
-import { EmptyView } from '../../../src/components/ui/StateViews';
-import { useAuth } from '../../../src/context/AuthContext';
+import { LoadingView } from '../../../src/components/ui/StateViews';
+import { useRequireRole } from '../../../src/hooks/useRequireRole';
 
 export default function UsersScreen() {
-  const { user } = useAuth();
-
-  if (user?.role !== 'ADMIN') return <Redirect href="/(protected)" />;
+  const isAdmin = useRequireRole(['ADMIN']);
+  if (!isAdmin) return <LoadingView />;
 
   return (
     <ScreenWrapper>
       <Header title="Usuarios" subtitle="Administración (ADMIN)" />
-      <EmptyView title="Próximamente" description="La administración estará disponible próximamente." />
     </ScreenWrapper>
   );
 }

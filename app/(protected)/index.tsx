@@ -1,12 +1,10 @@
-import { Header } from '../../src/components/layout/Header';
-import { ScreenWrapper } from '../../src/components/layout/ScreenWrapper';
-import { EmptyView } from '../../src/components/ui/StateViews';
+import { StyleSheet, Text, View } from 'react-native';
 
 export default function HomeScreen() {
-  return (
-    <ScreenWrapper>
-      <Header title="Inicio" subtitle="Tu espacio para organizar actividades" />
-      <EmptyView title="Próximamente" description="Aquí aparecerá tu actividad reciente." />
-    </ScreenWrapper>
-  );
+  return <View style={styles.container}><Text style={styles.label}>Home</Text></View>;
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  label: { fontSize: 18 },
+});

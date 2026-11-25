@@ -1,12 +1,10 @@
-import { Header } from '../../src/components/layout/Header';
-import { ScreenWrapper } from '../../src/components/layout/ScreenWrapper';
-import { EmptyView } from '../../src/components/ui/StateViews';
+import { StyleSheet, Text, View } from 'react-native';
 
 export default function ChatScreen() {
-  return (
-    <ScreenWrapper>
-      <Header title="Chat" />
-      <EmptyView title="Sin conversaciones" description="Tus conversaciones aparecerán aquí." />
-    </ScreenWrapper>
-  );
+  return <View style={styles.container}><Text style={styles.label}>Chat</Text></View>;
 }
+
+const styles = StyleSheet.create({
+  container: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  label: { fontSize: 18 },
+});

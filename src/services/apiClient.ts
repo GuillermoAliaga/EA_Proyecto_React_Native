@@ -28,7 +28,7 @@ export interface ApiRequestOptions extends Omit<RequestInit, 'body' | 'headers'>
   skipAuthRefresh?: boolean;
 }
 
-let refreshInProgress: Promise<void> | null = null;
+let refreshInProgress: Promise<unknown> | null = null;
 
 function buildUrl(path: string, params?: Record<string, QueryValue>): string {
   const url = `${environment.apiUrl}${path.startsWith('/') ? path : `/${path}`}`;
@@ -68,15 +68,16 @@ function errorMessage(body: unknown, fallback: string): string {
 }
 
 function isAuthEndpoint(path: string): boolean {
-  return /^\/?auth\/(login|register|refresh)(?:[/?#]|$)/.test(path);
+  return /^\/?auth\/(login|register|refresh|logout)(?:[/?#]|$)/.test(path);
 }
 
-async function refreshAccessToken(): Promise<void> {
+async function refreshAccessToken(): Promise<unknown> {
   if (refreshInProgress) return refreshInProgress;
 
   refreshInProgress = (async () => {
     try {
       const refreshToken = await getRefreshToken();
+      const currentAccessToken = getAccessToken();
       const headers = new Headers({ Accept: 'application/json' });
       let body: string | undefined;
 
@@ -114,12 +115,14 @@ async function refreshAccessToken(): Promise<void> {
       const nextRefreshToken = data.refreshToken;
 
       await setSessionTokens({
-        accessToken: typeof nextAccessToken === 'string' ? nextAccessToken : null,
+        accessToken:
+          typeof nextAccessToken === 'string' ? nextAccessToken : currentAccessToken,
         refreshToken:
           typeof nextRefreshToken === 'string'
             ? nextRefreshToken
             : refreshToken,
       });
+      return responseBody;
     } catch (error) {
       await clearSessionTokens();
       notifySessionExpired();
@@ -207,14 +210,5 @@ export function apiClient<T>(
 }
 
 export async function refreshSession(): Promise<unknown> {
-  const refreshToken = await getRefreshToken();
-  return apiClient<unknown>(
-    '/auth/refresh',
-    {
-      method: 'POST',
-      auth: false,
-      skipAuthRefresh: true,
-      ...(refreshToken ? { body: { refreshToken } } : {}),
-    },
-  );
+  return refreshAccessToken();
 }

@@ -1,10 +1,12 @@
-import { Redirect, Tabs } from 'expo-router';
+import { Redirect, Tabs, usePathname } from 'expo-router';
 import { ErrorView, LoadingView } from '../../src/components/ui/StateViews';
 import { useAuth } from '../../src/context/AuthContext';
 import { theme } from '../../src/config/theme';
+import { AdminMenu } from '../../src/components/layout/AdminMenu';
 
 export default function ProtectedLayout() {
   const { user, isInitializing, initializationError, retryInitialization } = useAuth();
+  const pathname = usePathname();
 
   if (isInitializing) return <LoadingView title="Comprobando sesión..." />;
   if (initializationError) {
@@ -16,29 +18,35 @@ export default function ProtectedLayout() {
       />
     );
   }
-  if (!user) return <Redirect href="/login" />;
+  if (!user) {
+    return <Redirect href={{ pathname: '/login', params: { redirect: pathname } }} />;
+  }
 
   return (
     <Tabs
       screenOptions={{
-        headerShown: false,
+        headerShown: true,
+        headerRight: () => <AdminMenu role={user.role} />,
+        headerStyle: { backgroundColor: theme.colors.surface },
+        headerTintColor: theme.colors.text,
         tabBarActiveTintColor: theme.colors.navigationActive,
         tabBarInactiveTintColor: theme.colors.textSecondary,
         tabBarStyle: { backgroundColor: theme.colors.navigation },
         tabBarLabelStyle: { fontWeight: '600' },
       }}
     >
-      <Tabs.Screen name="index" options={{ title: 'Inicio' }} />
-      <Tabs.Screen name="chat" options={{ title: 'Chat' }} />
-      <Tabs.Screen name="activities/index" options={{ title: 'Actividades' }} />
-      <Tabs.Screen name="reports/index" options={{ title: 'Denuncias' }} />
+      <Tabs.Screen name="index" options={{ title: 'Inicio', tabBarLabel: 'Inicio' }} />
       <Tabs.Screen
-        name="users/index"
-        options={{
-          title: 'Usuarios',
-          href: user.role === 'ADMIN' ? undefined : null,
-        }}
+        name="activities/index"
+        options={{ title: 'Actividades', tabBarLabel: 'Actividades' }}
       />
+      <Tabs.Screen name="chat" options={{ title: 'Chat', tabBarLabel: 'Chat' }} />
+      <Tabs.Screen
+        name="reports/index"
+        options={{ title: 'Denunciar', tabBarLabel: 'Denunciar' }}
+      />
+      <Tabs.Screen name="users/index" options={{ href: null, title: 'Gestión de usuarios' }} />
+      <Tabs.Screen name="reports/review" options={{ href: null, title: 'Revisión de denuncias' }} />
     </Tabs>
   );
 }

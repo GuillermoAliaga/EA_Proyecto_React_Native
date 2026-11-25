@@ -1,5 +1,10 @@
 import { ApiError, apiClient, refreshSession } from './apiClient';
-import { clearSessionTokens, getRefreshToken, setSessionTokens } from './sessionTokens';
+import {
+  clearSessionTokens,
+  getAccessToken,
+  getRefreshToken,
+  setSessionTokens,
+} from './sessionTokens';
 import { ROLES } from '../models/user.model';
 import type { User, UserRole } from '../models/user.model';
 
@@ -17,20 +22,24 @@ function unwrapAuthPayload(payload: unknown): AuthPayload {
   return response.data ?? response;
 }
 
-function getUser(payload: AuthPayload): User | null {
-  const user = payload.user;
+function isUser(value: unknown): value is User {
+  if (typeof value !== 'object' || value === null) return false;
+  const candidate = value as Partial<User>;
   if (
-    typeof user === 'object' &&
-    user !== null &&
-    typeof user._id === 'string' &&
-    typeof user.name === 'string' &&
-    typeof user.email === 'string' &&
-    typeof user.role === 'string' &&
-    ROLES.some((role: UserRole) => role === user.role)
+    typeof candidate._id === 'string' &&
+    typeof candidate.name === 'string' &&
+    typeof candidate.email === 'string' &&
+    typeof candidate.role === 'string' &&
+    ROLES.some((role: UserRole) => role === candidate.role)
   ) {
-    return user;
+    return true;
   }
-  return null;
+  return false;
+}
+
+function getUser(payload: AuthPayload): User | null {
+  const candidate = payload.user ?? payload;
+  return isUser(candidate) ? candidate : null;
 }
 
 async function persistPayloadTokens(
@@ -52,13 +61,8 @@ export async function login(email: string, password: string): Promise<User> {
     body: { email, password },
   });
   const payload = unwrapAuthPayload(response);
-  const user = getUser(payload);
-
-  if (!user) {
-    throw new ApiError('La respuesta de inicio de sesión no incluye un usuario válido.', 502);
-  }
-
   await persistPayloadTokens(payload);
+  const user = getUser(payload) ?? (await getCurrentUser());
   return user;
 }
 
@@ -68,7 +72,7 @@ export async function restoreSession(): Promise<User | null> {
     const response = await refreshSession();
     const payload = unwrapAuthPayload(response);
     await persistPayloadTokens(payload, storedRefreshToken);
-    return getUser(payload);
+    return getCurrentUser();
   } catch (error) {
     if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
       await clearSessionTokens();
@@ -78,6 +82,39 @@ export async function restoreSession(): Promise<User | null> {
   }
 }
 
+export async function register(input: {
+  name: string;
+  email: string;
+  password: string;
+}): Promise<void> {
+  await apiClient('/auth/register', {
+    method: 'POST',
+    auth: false,
+    skipAuthRefresh: true,
+    body: { name: input.name, email: input.email, password: input.password },
+  });
+}
+
 export async function logout(): Promise<void> {
-  await clearSessionTokens();
+  try {
+    await apiClient('/auth/logout', {
+      method: 'POST',
+      skipAuthRefresh: true,
+    });
+  } finally {
+    await clearSessionTokens();
+  }
+}
+
+export function getCurrentAccessToken(): string | null {
+  return getAccessToken();
+}
+
+async function getCurrentUser(): Promise<User> {
+  const response = await apiClient<unknown>('/users/me', { method: 'GET' });
+  const user = getUser(unwrapAuthPayload(response));
+  if (!user) {
+    throw new ApiError('La respuesta de /users/me no incluye un usuario válido.', 502);
+  }
+  return user;
 }
