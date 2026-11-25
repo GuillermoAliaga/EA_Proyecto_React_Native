@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, FlatList, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, FlatList, RefreshControl, StyleSheet, Switch, Text, View } from 'react-native';
+import { Picker } from '@react-native-picker/picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { UserCard } from '../../../src/components/domain/UserCard';
 import { Header } from '../../../src/components/layout/Header';
@@ -9,10 +10,11 @@ import { AppInput } from '../../../src/components/ui/AppInput';
 import { EmptyView, ErrorView, LoadingView } from '../../../src/components/ui/StateViews';
 import { useAuth } from '../../../src/context/AuthContext';
 import { useToast } from '../../../src/context/ToastContext';
-import { theme } from '../../../src/config/theme';
+import { useTheme } from '../../../src/context/ThemeContext';
 import { useRequireRole } from '../../../src/hooks/useRequireRole';
 import { useDebounce } from '../../../src/hooks/useDebounce';
-import type { User } from '../../../src/models';
+import type { User, UserRole } from '../../../src/models';
+import { ROLES } from '../../../src/models';
 import {
   bulkDeleteUsers,
   bulkSoftDeleteUsers,
@@ -27,6 +29,8 @@ const PAGE_SIZE = 10;
 type RouteParams = {
   search?: string | string[];
   page?: string | string[];
+  role?: string | string[];
+  isBanned?: string | string[];
   showDeleted?: string | string[];
 };
 
@@ -44,8 +48,14 @@ export default function UsersScreen() {
   const params = useLocalSearchParams<RouteParams>();
   const { user: currentUser } = useAuth();
   const { showToast } = useToast();
+  const { colors } = useTheme();
   const search = firstParam(params.search);
   const page = pageNumber(firstParam(params.page));
+  const rawRole = firstParam(params.role);
+  const role = ROLES.includes(rawRole as UserRole) ? (rawRole as UserRole) : '';
+  const rawIsBanned = firstParam(params.isBanned);
+  const isBanned =
+    rawIsBanned === 'true' ? true : rawIsBanned === 'false' ? false : undefined;
   const showDeleted = firstParam(params.showDeleted) === 'true';
   const [searchText, setSearchText] = useState(search);
   const debouncedSearch = useDebounce(searchText, 400);
@@ -65,8 +75,15 @@ export default function UsersScreen() {
   }, [debouncedSearch, search]);
 
   const query = useMemo(
-    () => ({ page, limit: PAGE_SIZE, search: search || undefined, showDeleted }),
-    [page, search, showDeleted],
+    () => ({
+      page,
+      limit: PAGE_SIZE,
+      search: search || undefined,
+      role: role || undefined,
+      isBanned,
+      showDeleted,
+    }),
+    [page, search, role, isBanned, showDeleted],
   );
 
   useEffect(() => {
@@ -80,6 +97,8 @@ export default function UsersScreen() {
       })
       .catch((requestError: unknown) => {
         if (!controller.signal.aborted) {
+          setUsers([]);
+          setTotalPages(0);
           setError(requestError instanceof Error ? requestError.message : 'No se pudieron cargar los usuarios.');
         }
       })
@@ -89,7 +108,7 @@ export default function UsersScreen() {
     return () => controller.abort();
   }, [query, reloadKey]);
 
-  useEffect(() => setSelectedIds([]), [page, search, showDeleted]);
+  useEffect(() => setSelectedIds([]), [page, search, role, isBanned, showDeleted]);
 
   const runMutation = async (id: string, operation: () => Promise<unknown>, message: string) => {
     setBusyId(id);
@@ -151,18 +170,47 @@ export default function UsersScreen() {
         }}
         returnKeyType="search"
       />
+      <View style={styles.filters}>
+        <View style={[styles.pickerWrap, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+          <Picker
+            accessibilityLabel="Filtrar por rol"
+            selectedValue={role}
+            style={{ color: colors.text }}
+            onValueChange={(value: string) =>
+              router.setParams({ role: value || undefined, page: '1' })
+            }
+          >
+            <Picker.Item label="Todos los roles" value="" />
+            {ROLES.map((item) => <Picker.Item key={item} label={item} value={item} />)}
+          </Picker>
+        </View>
+        <View style={[styles.pickerWrap, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+          <Picker
+            accessibilityLabel="Filtrar por estado de baneo"
+            selectedValue={rawIsBanned}
+            style={{ color: colors.text }}
+            onValueChange={(value: string) =>
+              router.setParams({ isBanned: value || undefined, page: '1' })
+            }
+          >
+            <Picker.Item label="Cualquier estado" value="" />
+            <Picker.Item label="Baneados" value="true" />
+            <Picker.Item label="No baneados" value="false" />
+          </Picker>
+        </View>
+      </View>
       <View style={styles.switchRow}>
-        <Text style={styles.switchLabel}>Ver archivados</Text>
+        <Text style={[styles.switchLabel, { color: colors.text }]}>Ver archivados</Text>
         <Switch
           accessibilityLabel="Ver usuarios archivados"
           value={showDeleted}
           onValueChange={(value) => router.setParams({ showDeleted: value ? 'true' : undefined, page: '1' })}
-          trackColor={{ true: theme.colors.primary }}
+          trackColor={{ true: colors.primary }}
         />
       </View>
       {selectedIds.length ? (
         <View style={styles.bulkActions}>
-          <Text style={styles.selectedLabel}>{selectedIds.length} seleccionados</Text>
+          <Text style={[styles.selectedLabel, { color: colors.text }]}>{selectedIds.length} seleccionados</Text>
           <AppButton
             title="Archivar selección"
             variant="secondary"
@@ -185,7 +233,7 @@ export default function UsersScreen() {
           />
         </View>
       ) : null}
-      {error && users.length === 0 && !loading ? (
+      {error && !loading ? (
         <ErrorView
           title="No se pudieron cargar los usuarios"
           description={error}
@@ -197,6 +245,13 @@ export default function UsersScreen() {
         <FlatList
           style={styles.list}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={() => setReloadKey((key) => key + 1)}
+              tintColor={colors.primary}
+            />
+          }
           data={users}
           keyExtractor={(item) => item._id}
           renderItem={({ item }) => {
@@ -233,26 +288,33 @@ export default function UsersScreen() {
           ListFooterComponent={
             <View style={styles.pagination}>
               <AppButton title="Anterior" variant="secondary" disabled={page <= 1} onPress={() => router.setParams({ page: String(page - 1) })} />
-              <Text style={styles.pageLabel}>Página {page} de {Math.max(totalPages, 1)}</Text>
+              <Text style={[styles.pageLabel, { color: colors.textSecondary }]}>Página {page} de {Math.max(totalPages, 1)}</Text>
               <AppButton title="Siguiente" variant="secondary" disabled={totalPages === 0 || page >= totalPages} onPress={() => router.setParams({ page: String(page + 1) })} />
             </View>
           }
         />
       )}
-      {error && users.length > 0 ? <Text accessibilityRole="alert" style={styles.inlineError}>{error}</Text> : null}
     </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
+  filters: { flexDirection: 'row', gap: 8 },
+  pickerWrap: {
+    flex: 1,
+    minHeight: 48,
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  switchLabel: { color: theme.colors.text, fontSize: 14, fontWeight: '600' },
+  switchLabel: { fontSize: 14, fontWeight: '600' },
   bulkActions: { gap: 8 },
-  selectedLabel: { color: theme.colors.text, fontWeight: '600' },
+  selectedLabel: { fontWeight: '600' },
   list: { flex: 1 },
   listContent: { flexGrow: 1, paddingBottom: 16 },
   separator: { height: 12 },
   pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 16 },
-  pageLabel: { color: theme.colors.textSecondary, fontSize: 13 },
-  inlineError: { color: theme.colors.danger, fontSize: 13 },
+  pageLabel: { fontSize: 13 },
 });

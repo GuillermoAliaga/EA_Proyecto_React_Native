@@ -3,7 +3,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import { useToast } from '../../context/ToastContext';
-import { theme } from '../../config/theme';
+import { useTheme } from '../../context/ThemeContext';
 import { REPORT_REASONS, TARGET_TYPES } from '../../models/report.model';
 import type { ReportInput, ReportReason, TargetType } from '../../models/report.model';
 import { createReport } from '../../services/report.service';
@@ -21,6 +21,7 @@ function firstParam(value: string | string[] | undefined): string {
 export function ReportCreateForm() {
   const params = useLocalSearchParams<{ targetType?: string | string[]; targetId?: string | string[] }>();
   const initialTargetType = firstParam(params.targetType);
+  const { colors } = useTheme();
   const { showToast } = useToast();
   const [targetType, setTargetType] = useState<TargetType>(
     TARGET_TYPES.includes(initialTargetType as TargetType) ? (initialTargetType as TargetType) : 'ACTIVITY',
@@ -66,9 +67,9 @@ export function ReportCreateForm() {
     <ScreenWrapper scroll>
       <Header title="Nueva denuncia" subtitle="Describe el contenido que quieres reportar." />
       <View style={styles.field}>
-        <Text style={styles.label}>Tipo de objetivo</Text>
-        <View style={styles.pickerWrap}>
-          <Picker selectedValue={targetType} onValueChange={(value: TargetType) => setTargetType(value)}>
+        <Text style={[styles.label, { color: colors.text }]}>Tipo de objetivo</Text>
+        <View style={[styles.pickerWrap, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+          <Picker style={{ color: colors.text }} selectedValue={targetType} onValueChange={(value: TargetType) => setTargetType(value)}>
             {TARGET_TYPES.map((type) => <Picker.Item key={type} label={type} value={type} />)}
           </Picker>
         </View>
@@ -81,15 +82,15 @@ export function ReportCreateForm() {
         placeholder="ID del usuario o actividad"
       />
       <View style={styles.field}>
-        <Text style={styles.label}>Motivo</Text>
-        <View style={styles.pickerWrap}>
-          <Picker selectedValue={reason} onValueChange={(value: ReportReason) => setReason(value)}>
+        <Text style={[styles.label, { color: colors.text }]}>Motivo</Text>
+        <View style={[styles.pickerWrap, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+          <Picker style={{ color: colors.text }} selectedValue={reason} onValueChange={(value: ReportReason) => setReason(value)}>
             {REPORT_REASONS.map((item) => <Picker.Item key={item} label={item} value={item} />)}
           </Picker>
         </View>
       </View>
       <View style={styles.field}>
-        <Text style={styles.label}>Descripción</Text>
+        <Text style={[styles.label, { color: colors.text }]}>Descripción</Text>
         <TextInput
           accessibilityLabel="Descripción"
           value={description}
@@ -100,13 +101,13 @@ export function ReportCreateForm() {
           multiline
           maxLength={1000}
           textAlignVertical="top"
-          style={styles.multiline}
+          style={[styles.multiline, { borderColor: colors.border, color: colors.text, backgroundColor: colors.surface }]}
           placeholder="Explica el motivo de la denuncia"
-          placeholderTextColor={theme.colors.textSecondary}
+          placeholderTextColor={colors.textSecondary}
         />
-        <Text style={styles.counter}>{description.length}/1000 caracteres (mínimo 5)</Text>
+        <Text style={[styles.counter, { color: colors.textSecondary }]}>{description.length}/1000 caracteres (mínimo 5)</Text>
       </View>
-      {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+      {error ? <Text accessibilityRole="alert" style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
       <AppButton title="Enviar denuncia" onPress={() => void submit()} loading={saving} />
     </ScreenWrapper>
   );
@@ -114,26 +115,21 @@ export function ReportCreateForm() {
 
 const styles = StyleSheet.create({
   field: { gap: 6 },
-  label: { color: theme.colors.text, fontSize: 14, fontWeight: '600' },
+  label: { fontSize: 14, fontWeight: '600' },
   pickerWrap: {
     minHeight: 48,
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: theme.colors.border,
     borderRadius: 10,
-    backgroundColor: theme.colors.surface,
     overflow: 'hidden',
   },
   multiline: {
     minHeight: 140,
     borderWidth: 1,
-    borderColor: theme.colors.border,
     borderRadius: 10,
     padding: 12,
-    color: theme.colors.text,
-    backgroundColor: theme.colors.surface,
     fontSize: 16,
   },
-  counter: { alignSelf: 'flex-end', color: theme.colors.textSecondary, fontSize: 12 },
-  error: { color: theme.colors.danger, fontSize: 14 },
+  counter: { alignSelf: 'flex-end', fontSize: 12 },
+  error: { fontSize: 14 },
 });

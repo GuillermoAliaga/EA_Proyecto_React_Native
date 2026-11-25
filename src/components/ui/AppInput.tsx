@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import type { TextInputProps } from 'react-native';
-import { theme } from '../../config/theme';
+import { useTheme } from '../../context/ThemeContext';
 
 interface AppInputProps extends TextInputProps {
   label: string;
@@ -9,19 +9,29 @@ interface AppInputProps extends TextInputProps {
 }
 
 export function AppInput({ label, error, secureTextEntry, style, ...props }: AppInputProps) {
+  const { colors } = useTheme();
   const [passwordVisible, setPasswordVisible] = useState(false);
   const canTogglePassword = Boolean(secureTextEntry);
 
   return (
     <View style={styles.container}>
-      <Text style={styles.label}>{label}</Text>
-      <View style={[styles.inputContainer, error && styles.inputError]}>
+      <Text style={[styles.label, { color: colors.text }]}>{label}</Text>
+      <View
+        style={[
+          styles.inputContainer,
+          {
+            borderColor: error ? colors.danger : colors.border,
+            backgroundColor: colors.surface,
+          },
+        ]}
+      >
         <TextInput
           accessibilityLabel={label}
-          style={[styles.input, style]}
-          placeholderTextColor={theme.colors.textSecondary}
+          placeholderTextColor={colors.textSecondary}
           secureTextEntry={canTogglePassword && !passwordVisible}
+          selectionColor={colors.primary}
           {...props}
+          style={[styles.input, { color: colors.text }, style]}
         />
         {canTogglePassword ? (
           <Pressable
@@ -30,30 +40,29 @@ export function AppInput({ label, error, secureTextEntry, style, ...props }: App
             onPress={() => setPasswordVisible((visible) => !visible)}
             hitSlop={8}
           >
-            <Text style={styles.toggleText}>{passwordVisible ? 'Ocultar' : 'Mostrar'}</Text>
+            <Text style={[styles.toggleText, { color: colors.primary }]}>
+              {passwordVisible ? 'Ocultar' : 'Mostrar'}
+            </Text>
           </Pressable>
         ) : null}
       </View>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <Text style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { gap: 6 },
-  label: { color: theme.colors.text, fontSize: 14, fontWeight: '600' },
+  label: { fontSize: 14, fontWeight: '600' },
   inputContainer: {
     minHeight: 48,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: theme.colors.border,
     borderRadius: 10,
     paddingHorizontal: 12,
-    backgroundColor: theme.colors.surface,
   },
-  input: { flex: 1, minHeight: 46, color: theme.colors.text, fontSize: 16 },
-  inputError: { borderColor: theme.colors.danger },
-  error: { color: theme.colors.danger, fontSize: 13 },
-  toggleText: { color: theme.colors.primary, fontWeight: '600', padding: 6 },
+  input: { flex: 1, minHeight: 46, fontSize: 16 },
+  error: { fontSize: 13 },
+  toggleText: { fontWeight: '600', padding: 6 },
 });

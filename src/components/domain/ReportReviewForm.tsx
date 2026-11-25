@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, TextInput, View } from 'react-native';
 import type { Report, ReportStatus } from '../../models/report.model';
 import { REPORT_STATUSES } from '../../models/report.model';
-import { theme } from '../../config/theme';
+import { useTheme } from '../../context/ThemeContext';
 import { useToast } from '../../context/ToastContext';
 import { getReport, updateReport } from '../../services/report.service';
 import { AppButton } from '../ui/AppButton';
@@ -15,6 +15,7 @@ import { ScreenWrapper } from '../layout/ScreenWrapper';
 
 export function ReportReviewForm({ reportId }: { reportId: string }) {
   const { showToast } = useToast();
+  const { colors } = useTheme();
   const [report, setReport] = useState<Report | null>(null);
   const [status, setStatus] = useState<ReportStatus>('PENDING');
   const [adminNotes, setAdminNotes] = useState('');
@@ -77,30 +78,30 @@ export function ReportReviewForm({ reportId }: { reportId: string }) {
   return (
     <ScreenWrapper scroll>
       <Header title="Revisar denuncia" />
-      <AppInput label="Tipo de objetivo" value={report.targetType} editable={false} style={styles.readOnly} />
-      <AppInput label="Identificador del objetivo" value={report.targetId} editable={false} style={styles.readOnly} />
-      <AppInput label="Motivo" value={report.reason} editable={false} style={styles.readOnly} />
+      <AppInput label="Tipo de objetivo" value={report.targetType} editable={false} style={{ backgroundColor: colors.background, color: colors.textSecondary }} />
+      <AppInput label="Identificador del objetivo" value={report.targetId} editable={false} style={{ backgroundColor: colors.background, color: colors.textSecondary }} />
+      <AppInput label="Motivo" value={report.reason} editable={false} style={{ backgroundColor: colors.background, color: colors.textSecondary }} />
       <View style={styles.field}>
-        <Text style={styles.label}>Descripción original</Text>
+        <Text style={[styles.label, { color: colors.text }]}>Descripción original</Text>
         <TextInput
           accessibilityLabel="Descripción original"
           value={report.description}
           editable={false}
           multiline
           textAlignVertical="top"
-          style={[styles.multiline, styles.readOnly]}
+          style={[styles.multiline, { borderColor: colors.border, color: colors.textSecondary, backgroundColor: colors.background }]}
         />
       </View>
       <View style={styles.field}>
-        <Text style={styles.label}>Estado</Text>
-        <View style={styles.pickerWrap}>
-          <Picker selectedValue={status} onValueChange={(value: ReportStatus) => setStatus(value)}>
+        <Text style={[styles.label, { color: colors.text }]}>Estado</Text>
+        <View style={[styles.pickerWrap, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+          <Picker style={{ color: colors.text }} selectedValue={status} onValueChange={(value: ReportStatus) => setStatus(value)}>
             {REPORT_STATUSES.map((item) => <Picker.Item key={item} label={item} value={item} />)}
           </Picker>
         </View>
       </View>
       <View style={styles.field}>
-        <Text style={styles.label}>Notas del administrador</Text>
+        <Text style={[styles.label, { color: colors.text }]}>Notas del administrador</Text>
         <TextInput
           accessibilityLabel="Notas del administrador"
           value={adminNotes}
@@ -111,13 +112,13 @@ export function ReportReviewForm({ reportId }: { reportId: string }) {
           multiline
           maxLength={500}
           textAlignVertical="top"
-          style={styles.multiline}
+          style={[styles.multiline, { borderColor: colors.border, color: colors.text, backgroundColor: colors.surface }]}
           placeholder="Añade notas para la revisión"
-          placeholderTextColor={theme.colors.textSecondary}
+          placeholderTextColor={colors.textSecondary}
         />
-        <Text style={styles.counter}>{adminNotes.length}/500 caracteres</Text>
+        <Text style={[styles.counter, { color: colors.textSecondary }]}>{adminNotes.length}/500 caracteres</Text>
       </View>
-      {formError ? <Text accessibilityRole="alert" style={styles.error}>{formError}</Text> : null}
+      {formError ? <Text accessibilityRole="alert" style={[styles.error, { color: colors.danger }]}>{formError}</Text> : null}
       <AppButton title="Guardar revisión" onPress={() => void submit()} loading={saving} />
     </ScreenWrapper>
   );
@@ -125,27 +126,21 @@ export function ReportReviewForm({ reportId }: { reportId: string }) {
 
 const styles = StyleSheet.create({
   field: { gap: 6 },
-  label: { color: theme.colors.text, fontSize: 14, fontWeight: '600' },
+  label: { fontSize: 14, fontWeight: '600' },
   pickerWrap: {
     minHeight: 48,
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: theme.colors.border,
     borderRadius: 10,
-    backgroundColor: theme.colors.surface,
     overflow: 'hidden',
   },
   multiline: {
     minHeight: 120,
     borderWidth: 1,
-    borderColor: theme.colors.border,
     borderRadius: 10,
     padding: 12,
-    color: theme.colors.text,
-    backgroundColor: theme.colors.surface,
     fontSize: 16,
   },
-  readOnly: { color: theme.colors.textSecondary, backgroundColor: '#eceff1' },
-  counter: { alignSelf: 'flex-end', color: theme.colors.textSecondary, fontSize: 12 },
-  error: { color: theme.colors.danger, fontSize: 14 },
+  counter: { alignSelf: 'flex-end', fontSize: 12 },
+  error: { fontSize: 14 },
 });

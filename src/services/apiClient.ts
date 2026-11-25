@@ -111,7 +111,7 @@ async function refreshAccessToken(): Promise<unknown> {
         typeof payload.data === 'object' && payload.data !== null
           ? (payload.data as Record<string, unknown>)
           : payload;
-      const nextAccessToken = data.accessToken ?? data.token;
+      const nextAccessToken = data.token;
       const nextRefreshToken = data.refreshToken;
 
       await setSessionTokens({

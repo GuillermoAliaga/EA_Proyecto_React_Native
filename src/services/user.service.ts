@@ -7,6 +7,8 @@ export interface UserListParams {
   sortBy?: string;
   sortOrder?: 'asc' | 'desc';
   search?: string;
+  role?: UserRole;
+  isBanned?: boolean;
   showDeleted?: boolean;
 }
 
@@ -28,7 +30,9 @@ export async function getUsers(
       sortBy: params.sortBy,
       sortOrder: params.sortOrder,
       search: params.search,
-      showDeleted: params.showDeleted,
+      role: params.role,
+      isBanned: params.isBanned,
+      showDeleted: params.showDeleted ? 'true' : undefined,
     },
     signal,
   });

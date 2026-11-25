@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, FlatList, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, FlatList, RefreshControl, StyleSheet, Switch, Text, View } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ActivityCard } from '../../../src/components/domain/ActivityCard';
@@ -17,13 +17,14 @@ import {
   deleteActivity,
   getActivities,
   joinActivity,
+  leaveActivity,
   restoreActivity,
   softDeleteActivity,
 } from '../../../src/services/activity.service';
 import { getCategories } from '../../../src/services/category.service';
 import type { CategoryOption } from '../../../src/services/category.service';
 import { useToast } from '../../../src/context/ToastContext';
-import { theme } from '../../../src/config/theme';
+import { useTheme } from '../../../src/context/ThemeContext';
 
 const PAGE_SIZE = 8;
 const ACTIVITY_STATUSES: ActivityStatus[] = ['OPEN', 'FULL', 'COMPLETED', 'CANCELLED'];
@@ -50,6 +51,7 @@ export default function ActivitiesScreen() {
   const params = useLocalSearchParams<RouteParams>();
   const { user } = useAuth();
   const { showToast } = useToast();
+  const { colors } = useTheme();
   const role = user?.role ?? 'USER';
   const isAdmin = role === 'ADMIN';
   const canCreate = role === 'ADMIN' || role === 'STORE_HOST';
@@ -114,6 +116,8 @@ export default function ActivitiesScreen() {
       })
       .catch((requestError: unknown) => {
         if (controller.signal.aborted) return;
+        setActivities([]);
+        setTotalPages(0);
         setError(
           requestError instanceof Error
             ? requestError.message
@@ -214,14 +218,14 @@ export default function ActivitiesScreen() {
         returnKeyType="search"
       />
       <View style={styles.filters}>
-        <View style={styles.pickerWrap}>
+        <View style={[styles.pickerWrap, { borderColor: colors.border, backgroundColor: colors.surface }]}>
           <Picker
             accessibilityLabel="Filtrar por categoría"
             selectedValue={category}
             onValueChange={(value: string) =>
               updateFilters({ category: value, status, showDeleted })
             }
-            style={styles.picker}
+            style={[styles.picker, { color: colors.text }]}
           >
             <Picker.Item label="Todas las categorías" value="" />
             {categories.map((item) => (
@@ -229,14 +233,14 @@ export default function ActivitiesScreen() {
             ))}
           </Picker>
         </View>
-        <View style={styles.pickerWrap}>
+        <View style={[styles.pickerWrap, { borderColor: colors.border, backgroundColor: colors.surface }]}>
           <Picker
             accessibilityLabel="Filtrar por estado"
             selectedValue={status}
             onValueChange={(value: string) =>
               updateFilters({ category, status: value, showDeleted })
             }
-            style={styles.picker}
+            style={[styles.picker, { color: colors.text }]}
           >
             <Picker.Item label="Todos los estados" value="" />
             {ACTIVITY_STATUSES.map((item) => (
@@ -246,7 +250,7 @@ export default function ActivitiesScreen() {
         </View>
       </View>
       {selectedCategory?.subcategories.length ? (
-        <View style={styles.pickerWrap}>
+        <View style={[styles.pickerWrap, { borderColor: colors.border, backgroundColor: colors.surface }]}>
           <Picker
             accessibilityLabel="Filtrar por subcategoría"
             selectedValue={firstParam(params.subcategory)}
@@ -256,7 +260,7 @@ export default function ActivitiesScreen() {
                 page: '1',
               })
             }
-            style={styles.picker}
+            style={[styles.picker, { color: colors.text }]}
           >
             <Picker.Item label="Todas las subcategorías" value="" />
             {selectedCategory.subcategories.map((item) => (
@@ -267,18 +271,18 @@ export default function ActivitiesScreen() {
       ) : null}
       {isAdmin ? (
         <View style={styles.switchRow}>
-          <Text style={styles.switchLabel}>Ver archivadas</Text>
+          <Text style={[styles.switchLabel, { color: colors.text }]}>Ver archivadas</Text>
           <Switch
             accessibilityLabel="Ver archivadas"
             value={showDeleted}
             onValueChange={(value) => updateFilters({ category, status, showDeleted: value })}
-            trackColor={{ true: theme.colors.primary }}
+            trackColor={{ true: colors.primary }}
           />
         </View>
       ) : null}
       {isAdmin && selectedIds.length ? (
         <View style={styles.bulkActions}>
-          <Text style={styles.selectedLabel}>{selectedIds.length} seleccionadas</Text>
+          <Text style={[styles.selectedLabel, { color: colors.text }]}>{selectedIds.length} seleccionadas</Text>
           <AppButton
             title="Archivar selección"
             variant="secondary"
@@ -306,7 +310,7 @@ export default function ActivitiesScreen() {
         </View>
       ) : null}
 
-      {error && activities.length === 0 && !loading ? (
+      {error && !loading ? (
         <ErrorView title="No se pudieron cargar las actividades" description={error} onRetry={() => setReloadKey((key) => key + 1)} />
       ) : loading && activities.length === 0 ? (
         <LoadingView title="Cargando actividades..." />
@@ -314,6 +318,13 @@ export default function ActivitiesScreen() {
         <FlatList
           style={styles.list}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={() => setReloadKey((key) => key + 1)}
+              tintColor={colors.primary}
+            />
+          }
           data={activities}
           keyExtractor={(item) => item._id}
           renderItem={({ item }) => (
@@ -329,6 +340,13 @@ export default function ActivitiesScreen() {
                   item._id,
                   () => joinActivity(item._id),
                   'Te has inscrito en la actividad.',
+                )
+              }
+              onLeave={() =>
+                void runMutation(
+                  item._id,
+                  () => leaveActivity(item._id, role),
+                  'Te has desapuntado de la actividad.',
                 )
               }
               onEdit={() =>
@@ -385,7 +403,7 @@ export default function ActivitiesScreen() {
                 disabled={page <= 1}
                 onPress={() => router.setParams({ page: String(page - 1) })}
               />
-              <Text style={styles.pageLabel}>
+              <Text style={[styles.pageLabel, { color: colors.textSecondary }]}>
                 Página {page} de {Math.max(totalPages, 1)}
               </Text>
               <AppButton
@@ -398,9 +416,6 @@ export default function ActivitiesScreen() {
           }
         />
       )}
-      {error && activities.length > 0 ? (
-        <Text accessibilityRole="alert" style={styles.inlineError}>{error}</Text>
-      ) : null}
     </ScreenWrapper>
   );
 }
@@ -412,16 +427,14 @@ const styles = StyleSheet.create({
     minHeight: 48,
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: theme.colors.border,
     borderRadius: 10,
-    backgroundColor: theme.colors.surface,
     overflow: 'hidden',
   },
-  picker: { color: theme.colors.text },
+  picker: {},
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  switchLabel: { color: theme.colors.text, fontSize: 14, fontWeight: '600' },
+  switchLabel: { fontSize: 14, fontWeight: '600' },
   bulkActions: { gap: 8 },
-  selectedLabel: { color: theme.colors.text, fontWeight: '600' },
+  selectedLabel: { fontWeight: '600' },
   list: { flex: 1 },
   listContent: { flexGrow: 1, paddingBottom: 16 },
   separator: { height: 12 },
@@ -432,6 +445,5 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 16,
   },
-  pageLabel: { color: theme.colors.textSecondary, fontSize: 13 },
-  inlineError: { color: theme.colors.danger, fontSize: 13 },
+  pageLabel: { fontSize: 13 },
 });

@@ -4,6 +4,7 @@ import { AuthProvider } from '../src/context/AuthContext';
 import { ToastProvider } from '../src/context/ToastContext';
 import { LoadingView } from '../src/components/ui/StateViews';
 import { useAuth } from '../src/context/AuthContext';
+import { ThemeProvider } from '../src/context/ThemeContext';
 
 function AppNavigator() {
   const { isInitializing } = useAuth();
@@ -14,11 +15,13 @@ function AppNavigator() {
 export default function RootLayout() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <ToastProvider>
-          <AppNavigator />
-        </ToastProvider>
-      </AuthProvider>
+      <ThemeProvider>
+        <AuthProvider>
+          <ToastProvider>
+            <AppNavigator />
+          </ToastProvider>
+        </AuthProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }

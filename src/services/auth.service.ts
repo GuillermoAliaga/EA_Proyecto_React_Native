@@ -10,7 +10,6 @@ import type { User, UserRole } from '../models/user.model';
 
 interface AuthPayload {
   user?: User;
-  accessToken?: string;
   token?: string;
   refreshToken?: string;
   data?: AuthPayload;
@@ -46,7 +45,7 @@ async function persistPayloadTokens(
   payload: AuthPayload,
   fallbackRefreshToken: string | null = null,
 ): Promise<void> {
-  const accessToken = payload.accessToken ?? payload.token ?? null;
+  const accessToken = payload.token ?? null;
   const refreshToken = payload.refreshToken ?? fallbackRefreshToken;
   await setSessionTokens({ accessToken, refreshToken });
 }
@@ -97,9 +96,11 @@ export async function register(input: {
 
 export async function logout(): Promise<void> {
   try {
+    const refreshToken = await getRefreshToken();
     await apiClient('/auth/logout', {
       method: 'POST',
       skipAuthRefresh: true,
+      ...(refreshToken ? { body: { refreshToken } } : {}),
     });
   } finally {
     await clearSessionTokens();

@@ -6,11 +6,12 @@ import { ScreenWrapper } from '../src/components/layout/ScreenWrapper';
 import { AppButton } from '../src/components/ui/AppButton';
 import { AppInput } from '../src/components/ui/AppInput';
 import { register } from '../src/services/auth.service';
-import { theme } from '../src/config/theme';
+import { useTheme } from '../src/context/ThemeContext';
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function RegisterScreen() {
+  const { colors } = useTheme();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -100,12 +101,18 @@ export default function RegisterScreen() {
           onPress={() => setAcceptedTerms((accepted) => !accepted)}
           style={styles.terms}
         >
-          <View style={[styles.checkbox, acceptedTerms && styles.checkboxChecked]}>
-            {acceptedTerms ? <Text style={styles.checkmark}>✓</Text> : null}
+          <View
+            style={[
+              styles.checkbox,
+              { borderColor: colors.textSecondary, backgroundColor: colors.surface },
+              acceptedTerms && { borderColor: colors.primary, backgroundColor: colors.primary },
+            ]}
+          >
+            {acceptedTerms ? <Text style={[styles.checkmark, { color: colors.surface }]}>✓</Text> : null}
           </View>
-          <Text style={styles.termsLabel}>Acepto los términos y condiciones</Text>
+          <Text style={[styles.termsLabel, { color: colors.text }]}>Acepto los términos y condiciones</Text>
         </Pressable>
-        {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
+        {error ? <Text accessibilityRole="alert" style={[styles.error, { color: colors.danger }]}>{error}</Text> : null}
         <AppButton
           title="Registrarme"
           onPress={() => void handleRegister()}
@@ -133,12 +140,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: theme.colors.textSecondary,
     borderRadius: 5,
-    backgroundColor: theme.colors.surface,
   },
-  checkboxChecked: { borderColor: theme.colors.primary, backgroundColor: theme.colors.primary },
-  checkmark: { color: theme.colors.surface, fontWeight: '700' },
-  termsLabel: { flex: 1, color: theme.colors.text, fontSize: 14 },
-  error: { color: theme.colors.danger, fontSize: 14 },
+  checkmark: { fontWeight: '700' },
+  termsLabel: { flex: 1, fontSize: 14 },
+  error: { fontSize: 14 },
 });

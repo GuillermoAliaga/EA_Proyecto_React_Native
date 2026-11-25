@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { theme } from '../../config/theme';
+import { useTheme } from '../../context/ThemeContext';
 
 interface ToastBannerProps {
   message: string;
@@ -9,6 +9,7 @@ interface ToastBannerProps {
 
 export function ToastBanner({ message, position = 'top' }: ToastBannerProps) {
   const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
 
   return (
     <View
@@ -19,8 +20,8 @@ export function ToastBanner({ message, position = 'top' }: ToastBannerProps) {
         position === 'top' ? { top: insets.top + 12 } : { bottom: insets.bottom + 12 },
       ]}
     >
-      <View style={styles.banner}>
-        <Text style={styles.message}>{message}</Text>
+      <View style={[styles.banner, { backgroundColor: colors.navigation }]}>
+        <Text style={[styles.message, { color: colors.surface }]}>{message}</Text>
       </View>
     </View>
   );
@@ -39,12 +40,11 @@ const styles = StyleSheet.create({
     width: '100%',
     paddingHorizontal: 16,
     paddingVertical: 13,
-    backgroundColor: theme.colors.navigation,
     borderRadius: 10,
     shadowColor: '#000000',
     shadowOpacity: 0.18,
     shadowRadius: 8,
     elevation: 5,
   },
-  message: { color: theme.colors.surface, fontSize: 14, fontWeight: '600' },
+  message: { fontSize: 14, fontWeight: '600' },
 });

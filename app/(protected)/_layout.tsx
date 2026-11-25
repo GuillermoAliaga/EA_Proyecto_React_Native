@@ -1,11 +1,12 @@
 import { Redirect, Tabs, usePathname } from 'expo-router';
 import { ErrorView, LoadingView } from '../../src/components/ui/StateViews';
 import { useAuth } from '../../src/context/AuthContext';
-import { theme } from '../../src/config/theme';
 import { AdminMenu } from '../../src/components/layout/AdminMenu';
+import { useTheme } from '../../src/context/ThemeContext';
 
 export default function ProtectedLayout() {
   const { user, isInitializing, initializationError, retryInitialization } = useAuth();
+  const { colors } = useTheme();
   const pathname = usePathname();
 
   if (isInitializing) return <LoadingView title="Comprobando sesión..." />;
@@ -27,11 +28,11 @@ export default function ProtectedLayout() {
       screenOptions={{
         headerShown: true,
         headerRight: () => <AdminMenu role={user.role} />,
-        headerStyle: { backgroundColor: theme.colors.surface },
-        headerTintColor: theme.colors.text,
-        tabBarActiveTintColor: theme.colors.navigationActive,
-        tabBarInactiveTintColor: theme.colors.textSecondary,
-        tabBarStyle: { backgroundColor: theme.colors.navigation },
+        headerStyle: { backgroundColor: colors.surface },
+        headerTintColor: colors.text,
+        tabBarActiveTintColor: colors.navigationActive,
+        tabBarInactiveTintColor: colors.textSecondary,
+        tabBarStyle: { backgroundColor: colors.navigation },
         tabBarLabelStyle: { fontWeight: '600' },
       }}
     >

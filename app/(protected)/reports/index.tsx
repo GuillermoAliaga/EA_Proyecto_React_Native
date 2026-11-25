@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, FlatList, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, FlatList, RefreshControl, StyleSheet, Switch, Text, View } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { router, useLocalSearchParams } from 'expo-router';
 import { ReportCard } from '../../../src/components/domain/ReportCard';
@@ -9,11 +9,15 @@ import { AppButton } from '../../../src/components/ui/AppButton';
 import { AppInput } from '../../../src/components/ui/AppInput';
 import { EmptyView, ErrorView, LoadingView } from '../../../src/components/ui/StateViews';
 import { useToast } from '../../../src/context/ToastContext';
-import { theme } from '../../../src/config/theme';
+import { useTheme } from '../../../src/context/ThemeContext';
 import { useRequireRole } from '../../../src/hooks/useRequireRole';
 import { useDebounce } from '../../../src/hooks/useDebounce';
-import type { Report, ReportStatus } from '../../../src/models';
-import { REPORT_STATUSES } from '../../../src/models/report.model';
+import type { Report, ReportReason, ReportStatus, ReportTargetType } from '../../../src/models';
+import {
+  REPORT_REASONS,
+  REPORT_STATUSES,
+  TARGET_TYPES,
+} from '../../../src/models/report.model';
 import {
   bulkDeleteReports,
   bulkSoftDeleteReports,
@@ -28,6 +32,8 @@ type RouteParams = {
   search?: string | string[];
   page?: string | string[];
   status?: string | string[];
+  reason?: string | string[];
+  targetType?: string | string[];
   showDeleted?: string | string[];
 };
 
@@ -44,11 +50,20 @@ export default function ReportsScreen() {
   const isAdmin = useRequireRole(['ADMIN']);
   const params = useLocalSearchParams<RouteParams>();
   const { showToast } = useToast();
+  const { colors } = useTheme();
   const search = firstParam(params.search);
   const page = pageNumber(firstParam(params.page));
   const rawStatus = firstParam(params.status);
   const status = REPORT_STATUSES.includes(rawStatus as ReportStatus)
     ? (rawStatus as ReportStatus)
+    : '';
+  const rawReason = firstParam(params.reason);
+  const reason = REPORT_REASONS.includes(rawReason as ReportReason)
+    ? (rawReason as ReportReason)
+    : '';
+  const rawTargetType = firstParam(params.targetType);
+  const targetType = TARGET_TYPES.includes(rawTargetType as ReportTargetType)
+    ? (rawTargetType as ReportTargetType)
     : '';
   const showDeleted = firstParam(params.showDeleted) === 'true';
   const [searchText, setSearchText] = useState(search);
@@ -74,9 +89,11 @@ export default function ReportsScreen() {
       limit: PAGE_SIZE,
       search: search || undefined,
       status: status || undefined,
+      reason: reason || undefined,
+      targetType: targetType || undefined,
       showDeleted,
     }),
-    [page, search, status, showDeleted],
+    [page, search, status, reason, targetType, showDeleted],
   );
 
   useEffect(() => {
@@ -90,6 +107,8 @@ export default function ReportsScreen() {
       })
       .catch((requestError: unknown) => {
         if (!controller.signal.aborted) {
+          setReports([]);
+          setTotalPages(0);
           setError(requestError instanceof Error ? requestError.message : 'No se pudieron cargar las denuncias.');
         }
       })
@@ -99,7 +118,10 @@ export default function ReportsScreen() {
     return () => controller.abort();
   }, [query, reloadKey]);
 
-  useEffect(() => setSelectedIds([]), [page, search, status, showDeleted]);
+  useEffect(
+    () => setSelectedIds([]),
+    [page, search, status, reason, targetType, showDeleted],
+  );
 
   const runMutation = async (id: string, operation: () => Promise<unknown>, message: string) => {
     setBusyId(id);
@@ -163,10 +185,11 @@ export default function ReportsScreen() {
         }}
         returnKeyType="search"
       />
-      <View style={styles.pickerWrap}>
+      <View style={[styles.pickerWrap, { borderColor: colors.border, backgroundColor: colors.surface }]}>
         <Picker
           accessibilityLabel="Filtrar por estado"
           selectedValue={status}
+          style={{ color: colors.text }}
           onValueChange={(value: string) =>
             router.setParams({ status: value || undefined, page: '1' })
           }
@@ -175,18 +198,46 @@ export default function ReportsScreen() {
           {REPORT_STATUSES.map((item) => <Picker.Item key={item} label={item} value={item} />)}
         </Picker>
       </View>
+      <View style={styles.filters}>
+        <View style={[styles.pickerWrap, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+          <Picker
+            accessibilityLabel="Filtrar por motivo"
+            selectedValue={reason}
+            style={{ color: colors.text }}
+            onValueChange={(value: string) =>
+              router.setParams({ reason: value || undefined, page: '1' })
+            }
+          >
+            <Picker.Item label="Todos los motivos" value="" />
+            {REPORT_REASONS.map((item) => <Picker.Item key={item} label={item} value={item} />)}
+          </Picker>
+        </View>
+        <View style={[styles.pickerWrap, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+          <Picker
+            accessibilityLabel="Filtrar por tipo de objetivo"
+            selectedValue={targetType}
+            style={{ color: colors.text }}
+            onValueChange={(value: string) =>
+              router.setParams({ targetType: value || undefined, page: '1' })
+            }
+          >
+            <Picker.Item label="Todos los objetivos" value="" />
+            {TARGET_TYPES.map((item) => <Picker.Item key={item} label={item} value={item} />)}
+          </Picker>
+        </View>
+      </View>
       <View style={styles.switchRow}>
-        <Text style={styles.switchLabel}>Ver archivadas</Text>
+        <Text style={[styles.switchLabel, { color: colors.text }]}>Ver archivadas</Text>
         <Switch
           accessibilityLabel="Ver denuncias archivadas"
           value={showDeleted}
           onValueChange={(value) => router.setParams({ showDeleted: value ? 'true' : undefined, page: '1' })}
-          trackColor={{ true: theme.colors.primary }}
+          trackColor={{ true: colors.primary }}
         />
       </View>
       {selectedIds.length ? (
         <View style={styles.bulkActions}>
-          <Text style={styles.selectedLabel}>{selectedIds.length} seleccionadas</Text>
+          <Text style={[styles.selectedLabel, { color: colors.text }]}>{selectedIds.length} seleccionadas</Text>
           <AppButton
             title="Archivar selección"
             variant="secondary"
@@ -209,7 +260,7 @@ export default function ReportsScreen() {
           />
         </View>
       ) : null}
-      {error && reports.length === 0 && !loading ? (
+      {error && !loading ? (
         <ErrorView
           title="No se pudieron cargar las denuncias"
           description={error}
@@ -221,6 +272,13 @@ export default function ReportsScreen() {
         <FlatList
           style={styles.list}
           contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={() => setReloadKey((key) => key + 1)}
+              tintColor={colors.primary}
+            />
+          }
           data={reports}
           keyExtractor={(item) => item._id}
           renderItem={({ item }) => (
@@ -250,35 +308,33 @@ export default function ReportsScreen() {
           ListFooterComponent={
             <View style={styles.pagination}>
               <AppButton title="Anterior" variant="secondary" disabled={page <= 1} onPress={() => router.setParams({ page: String(page - 1) })} />
-              <Text style={styles.pageLabel}>Página {page} de {Math.max(totalPages, 1)}</Text>
+              <Text style={[styles.pageLabel, { color: colors.textSecondary }]}>Página {page} de {Math.max(totalPages, 1)}</Text>
               <AppButton title="Siguiente" variant="secondary" disabled={totalPages === 0 || page >= totalPages} onPress={() => router.setParams({ page: String(page + 1) })} />
             </View>
           }
         />
       )}
-      {error && reports.length > 0 ? <Text accessibilityRole="alert" style={styles.inlineError}>{error}</Text> : null}
     </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
+  filters: { flexDirection: 'row', gap: 8 },
   pickerWrap: {
+    flex: 1,
     minHeight: 48,
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: theme.colors.border,
     borderRadius: 10,
-    backgroundColor: theme.colors.surface,
     overflow: 'hidden',
   },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  switchLabel: { color: theme.colors.text, fontSize: 14, fontWeight: '600' },
+  switchLabel: { fontSize: 14, fontWeight: '600' },
   bulkActions: { gap: 8 },
-  selectedLabel: { color: theme.colors.text, fontWeight: '600' },
+  selectedLabel: { fontWeight: '600' },
   list: { flex: 1 },
   listContent: { flexGrow: 1, paddingBottom: 16 },
   separator: { height: 12 },
   pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 16 },
-  pageLabel: { color: theme.colors.textSecondary, fontSize: 13 },
-  inlineError: { color: theme.colors.danger, fontSize: 13 },
+  pageLabel: { fontSize: 13 },
 });

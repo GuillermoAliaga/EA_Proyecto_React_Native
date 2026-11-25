@@ -1,4 +1,12 @@
-import type { PaginatedResponse, Report, ReportInput, ReportReviewInput, ReportStatus } from '../models';
+import type {
+  PaginatedResponse,
+  Report,
+  ReportInput,
+  ReportReviewInput,
+  ReportStatus,
+  ReportReason,
+  ReportTargetType,
+} from '../models';
 import { apiClient } from './apiClient';
 
 export interface ReportListParams {
@@ -8,6 +16,8 @@ export interface ReportListParams {
   sortOrder?: 'asc' | 'desc';
   search?: string;
   status?: ReportStatus;
+  reason?: ReportReason;
+  targetType?: ReportTargetType;
   showDeleted?: boolean;
 }
 
@@ -30,7 +40,9 @@ export async function getReports(
       sortOrder: params.sortOrder,
       search: params.search,
       status: params.status,
-      showDeleted: params.showDeleted,
+      reason: params.reason,
+      targetType: params.targetType,
+      showDeleted: params.showDeleted ? 'true' : undefined,
     },
     signal,
   });

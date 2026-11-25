@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import type { Activity, ActivityInput, Modality } from '../../models/activity.model';
 import { MODALITIES } from '../../models/activity.model';
-import { theme } from '../../config/theme';
+import { useTheme } from '../../context/ThemeContext';
 import { getCategories } from '../../services/category.service';
 import type { CategoryOption } from '../../services/category.service';
 import { createActivity, getActivity, updateActivity } from '../../services/activity.service';
@@ -87,6 +87,7 @@ function formatDateTime(date: Date): string {
 export function ActivityForm({ activityId }: ActivityFormProps) {
   const editing = Boolean(activityId);
   const { showToast } = useToast();
+  const { colors } = useTheme();
   const [activity, setActivity] = useState<Activity | null>(null);
   const [loadingActivity, setLoadingActivity] = useState(editing);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -253,6 +254,10 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
       setFormError('Selecciona una categoría y una subcategoría.');
       return;
     }
+    if (address.trim().length < 2 || address.trim().length > 200) {
+      setFormError('La dirección debe tener entre 2 y 200 caracteres.');
+      return;
+    }
     if (
       !coordinates ||
       coordinates.length !== 2 ||
@@ -285,8 +290,8 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
     const payload: ActivityInput = {
       title: title.trim(),
       description: description.trim(),
-      category,
-      subcategory,
+      category: category.trim().toUpperCase(),
+      subcategory: subcategory.trim().toUpperCase(),
       modality,
       status: activity?.status ?? 'OPEN',
       location: {
@@ -347,15 +352,15 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
         style={styles.multiline}
       />
       <View style={styles.field}>
-        <Text style={styles.label}>Categoría</Text>
-        <View style={styles.pickerWrap}>
+        <Text style={[styles.label, { color: colors.text }]}>Categoría</Text>
+        <View style={[styles.pickerWrap, { borderColor: colors.border, backgroundColor: colors.surface }]}>
           <Picker
             selectedValue={category}
             onValueChange={(value: string) => {
               setCategory(value);
               setSubcategory('');
             }}
-            style={styles.picker}
+            style={[styles.picker, { color: colors.text }]}
           >
             <Picker.Item label="Selecciona una categoría" value="" />
             {categories.map((item) => (
@@ -365,13 +370,13 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
         </View>
       </View>
       <View style={styles.field}>
-        <Text style={styles.label}>Subcategoría</Text>
-        <View style={styles.pickerWrap}>
+        <Text style={[styles.label, { color: colors.text }]}>Subcategoría</Text>
+        <View style={[styles.pickerWrap, { borderColor: colors.border, backgroundColor: colors.surface }]}>
           <Picker
             selectedValue={subcategory}
             enabled={Boolean(selectedCategory)}
             onValueChange={(value: string) => setSubcategory(value)}
-            style={styles.picker}
+            style={[styles.picker, { color: colors.text }]}
           >
             <Picker.Item label="Selecciona una subcategoría" value="" />
             {selectedCategory?.subcategories.map((item) => (
@@ -381,12 +386,12 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
         </View>
       </View>
       <View style={styles.field}>
-        <Text style={styles.label}>Modalidad</Text>
-        <View style={styles.pickerWrap}>
+        <Text style={[styles.label, { color: colors.text }]}>Modalidad</Text>
+        <View style={[styles.pickerWrap, { borderColor: colors.border, backgroundColor: colors.surface }]}>
           <Picker
             selectedValue={modality}
             onValueChange={(value: Modality) => setModality(value)}
-            style={styles.picker}
+            style={[styles.picker, { color: colors.text }]}
           >
             {MODALITIES.map((item) => (
               <Picker.Item key={item} label={item} value={item} />
@@ -403,13 +408,13 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
         autoComplete="street-address"
       />
       {coordinates ? (
-        <Text style={styles.selectedAddress}>Ubicación seleccionada</Text>
+        <Text style={[styles.selectedAddress, { color: colors.primary }]}>Ubicación seleccionada</Text>
       ) : address.trim().length >= 3 ? (
-        <Text style={styles.locationHint}>Selecciona un resultado para fijar las coordenadas.</Text>
+        <Text style={[styles.locationHint, { color: colors.textSecondary }]}>Selecciona un resultado para fijar las coordenadas.</Text>
       ) : null}
-      {loadingSuggestions ? <Text style={styles.locationHint}>Buscando direcciones...</Text> : null}
+      {loadingSuggestions ? <Text style={[styles.locationHint, { color: colors.textSecondary }]}>Buscando direcciones...</Text> : null}
       {suggestionError ? (
-        <Text accessibilityRole="alert" style={styles.error}>{suggestionError}</Text>
+        <Text accessibilityRole="alert" style={[styles.error, { color: colors.danger }]}>{suggestionError}</Text>
       ) : null}
       {suggestions.map((suggestion, index) => (
         <Pressable
@@ -422,18 +427,18 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
             setSuggestions([]);
             setSuggestionError(null);
           }}
-          style={styles.suggestion}
+          style={[styles.suggestion, { borderColor: colors.border, backgroundColor: colors.surface }]}
         >
-          <Text style={styles.suggestionText}>{suggestion.label}</Text>
+          <Text style={[styles.suggestionText, { color: colors.text }]}>{suggestion.label}</Text>
         </Pressable>
       ))}
       <View style={styles.switchRow}>
-        <Text style={styles.label}>¿Es una ubicación de tienda?</Text>
+        <Text style={[styles.label, { color: colors.text }]}>¿Es una ubicación de tienda?</Text>
         <Switch value={isStoreLocation} onValueChange={(value) => setIsStoreLocation(Boolean(value))} />
       </View>
 
       <View style={styles.dateSection}>
-        <Text style={styles.label}>Inicio</Text>
+        <Text style={[styles.label, { color: colors.text }]}>Inicio</Text>
         <View style={styles.dateActions}>
           <AppButton
             title={formatDateTime(startTime)}
@@ -448,7 +453,7 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
         </View>
       </View>
       <View style={styles.dateSection}>
-        <Text style={styles.label}>Fin</Text>
+        <Text style={[styles.label, { color: colors.text }]}>Fin</Text>
         <View style={styles.dateActions}>
           <AppButton
             title={formatDateTime(endTime)}
@@ -463,7 +468,7 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
         </View>
       </View>
       {datePicker ? (
-        <View style={styles.pickerSection}>
+        <View style={[styles.pickerSection, { backgroundColor: colors.surface }]}>
           <DateTimePicker
             value={datePicker.target === 'start' ? startTime : endTime}
             mode={datePicker.mode}
@@ -496,7 +501,7 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
         onChangeText={setPrice}
         keyboardType="decimal-pad"
       />
-      {formError ? <Text accessibilityRole="alert" style={styles.error}>{formError}</Text> : null}
+      {formError ? <Text accessibilityRole="alert" style={[styles.error, { color: colors.danger }]}>{formError}</Text> : null}
       <AppButton
         title={editing ? 'Guardar cambios' : 'Crear actividad'}
         onPress={() => void handleSubmit()}
@@ -509,32 +514,28 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
 
 const styles = StyleSheet.create({
   field: { gap: 6 },
-  label: { color: theme.colors.text, fontSize: 14, fontWeight: '600' },
+  label: { fontSize: 14, fontWeight: '600' },
   pickerWrap: {
     minHeight: 48,
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: theme.colors.border,
     borderRadius: 10,
-    backgroundColor: theme.colors.surface,
     overflow: 'hidden',
   },
-  picker: { color: theme.colors.text },
+  picker: {},
   multiline: { minHeight: 100, textAlignVertical: 'top', paddingTop: 10 },
-  selectedAddress: { color: theme.colors.primary, fontSize: 13 },
-  locationHint: { color: theme.colors.textSecondary, fontSize: 13 },
+  selectedAddress: { fontSize: 13 },
+  locationHint: { fontSize: 13 },
   suggestion: {
     padding: 12,
     borderWidth: 1,
-    borderColor: theme.colors.border,
     borderRadius: 8,
-    backgroundColor: theme.colors.surface,
   },
-  suggestionText: { color: theme.colors.text, fontSize: 14 },
+  suggestionText: { fontSize: 14 },
   switchRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   dateSection: { gap: 8 },
   dateActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  pickerSection: { padding: 8, borderRadius: 10, backgroundColor: theme.colors.surface },
+  pickerSection: { padding: 8, borderRadius: 10 },
   numericRow: { flexDirection: 'row', gap: 10 },
-  error: { color: theme.colors.danger, fontSize: 14 },
+  error: { fontSize: 14 },
 });

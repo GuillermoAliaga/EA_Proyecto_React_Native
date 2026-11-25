@@ -8,10 +8,11 @@ import { AppButton } from '../src/components/ui/AppButton';
 import { AppInput } from '../src/components/ui/AppInput';
 import { useAuth } from '../src/context/AuthContext';
 import { useToast } from '../src/context/ToastContext';
-import { theme } from '../src/config/theme';
+import { useTheme } from '../src/context/ThemeContext';
 
 export default function LoginScreen() {
   const { signIn, initializationError, retryInitialization } = useAuth();
+  const { colors } = useTheme();
   const { redirect, registered } = useLocalSearchParams<{
     redirect?: string | string[];
     registered?: string | string[];
@@ -79,7 +80,7 @@ export default function LoginScreen() {
           autoComplete="password"
         />
         {error || initializationError ? (
-          <Text accessibilityRole="alert" style={styles.error}>
+          <Text accessibilityRole="alert" style={[styles.error, { color: colors.danger }]}>
             {error ?? initializationError}
           </Text>
         ) : null}
@@ -97,7 +98,7 @@ export default function LoginScreen() {
           loading={loading}
           disabled={loading}
         />
-        <Link href="/register" style={styles.link}>¿No tienes cuenta? Regístrate</Link>
+        <Link href="/register" style={[styles.link, { color: colors.primary }]}>¿No tienes cuenta? Regístrate</Link>
       </View>
     </ScreenWrapper>
   );
@@ -105,6 +106,6 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   form: { flex: 1, justifyContent: 'center', gap: 18, width: '100%', maxWidth: 480, alignSelf: 'center' },
-  link: { color: theme.colors.primary, textAlign: 'center', fontWeight: '600' },
-  error: { color: theme.colors.danger, fontSize: 14 },
+  link: { textAlign: 'center', fontWeight: '600' },
+  error: { fontSize: 14 },
 });

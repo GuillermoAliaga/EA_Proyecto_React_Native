@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { Activity, UserRole } from '../../models';
-import { theme } from '../../config/theme';
+import { useTheme } from '../../context/ThemeContext';
 import { AppBadge } from '../ui/AppBadge';
 import { AppButton } from '../ui/AppButton';
 import { AppCard } from '../ui/AppCard';
@@ -13,6 +13,7 @@ interface ActivityCardProps {
   busy?: boolean;
   onSelect?: () => void;
   onJoin?: () => void;
+  onLeave?: () => void;
   onEdit?: () => void;
   onArchive?: () => void;
   onRestore?: () => void;
@@ -52,11 +53,13 @@ export function ActivityCard({
   busy = false,
   onSelect,
   onJoin,
+  onLeave,
   onEdit,
   onArchive,
   onRestore,
   onDelete,
 }: ActivityCardProps) {
+  const { colors } = useTheme();
   const maxParticipants = activity.capacity.maxParticipants;
   const participantCount = activity.participants.length;
   const isEnrolled = Boolean(
@@ -73,12 +76,16 @@ export function ActivityCard({
             accessibilityRole="checkbox"
             accessibilityState={{ checked: selected }}
             onPress={onSelect}
-            style={[styles.checkbox, selected && styles.checkboxSelected]}
+            style={[
+              styles.checkbox,
+              { borderColor: colors.textSecondary },
+              selected && { backgroundColor: colors.primary, borderColor: colors.primary },
+            ]}
           >
-            <Text style={styles.checkboxText}>{selected ? '✓' : ''}</Text>
+            <Text style={[styles.checkboxText, { color: colors.surface }]}>{selected ? '✓' : ''}</Text>
           </Pressable>
         ) : null}
-        <Text style={styles.title}>{activity.title}</Text>
+        <Text style={[styles.title, { color: colors.text }]}>{activity.title}</Text>
         <AppBadge label={activity.deleted ? 'Archivada' : activity.status} />
       </View>
 
@@ -88,20 +95,24 @@ export function ActivityCard({
         <AppBadge label={activity.modality} />
       </View>
 
-      <Text style={styles.description}>{truncate(activity.description)}</Text>
-      <Text style={styles.detail}>{activity.location.addressName}</Text>
-      <Text style={styles.detail}>
+      <Text style={[styles.description, { color: colors.text }]}>{truncate(activity.description)}</Text>
+      <Text style={[styles.detail, { color: colors.textSecondary }]}>{activity.location.addressName}</Text>
+      <Text style={[styles.detail, { color: colors.textSecondary }]}>
         {formatSchedule(activity.schedule.startTime, activity.schedule.endTime)}
       </Text>
       <View style={styles.meta}>
-        <Text style={styles.price}>{formatPrice(activity.pricing.price)}</Text>
-        <Text style={styles.detail}>
+        <Text style={[styles.price, { color: colors.text }]}>{formatPrice(activity.pricing.price)}</Text>
+        <Text style={[styles.detail, { color: colors.textSecondary }]}>
           Plazas: {participantCount}/{maxParticipants}
         </Text>
       </View>
 
       {role === 'USER' && isEnrolled ? (
-        <AppButton title="Inscrito" variant="secondary" disabled />
+        onLeave && activity.status !== 'COMPLETED' && activity.status !== 'CANCELLED' ? (
+          <AppButton title="Desapuntarme" variant="secondary" onPress={onLeave} loading={busy} />
+        ) : (
+          <AppButton title="Inscrito" variant="secondary" disabled />
+        )
       ) : role === 'USER' && hasOpenSpots ? (
         <AppButton title="Inscribirse" onPress={onJoin} loading={busy} disabled={busy} />
       ) : null}
@@ -124,24 +135,22 @@ export function ActivityCard({
 const styles = StyleSheet.create({
   card: { gap: 10 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  title: { flex: 1, color: theme.colors.text, fontSize: 17, fontWeight: '700' },
+  title: { flex: 1, fontSize: 17, fontWeight: '700' },
   checkbox: {
     width: 24,
     height: 24,
     textAlign: 'center',
     textAlignVertical: 'center',
     borderWidth: 1,
-    borderColor: theme.colors.textSecondary,
     borderRadius: 5,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxSelected: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-  checkboxText: { color: theme.colors.surface, fontWeight: '700' },
+  checkboxText: { fontWeight: '700' },
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  description: { color: theme.colors.text, fontSize: 14, lineHeight: 20 },
-  detail: { color: theme.colors.textSecondary, fontSize: 13 },
+  description: { fontSize: 14, lineHeight: 20 },
+  detail: { fontSize: 13 },
   meta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  price: { color: theme.colors.text, fontSize: 15, fontWeight: '700' },
+  price: { fontSize: 15, fontWeight: '700' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
 });

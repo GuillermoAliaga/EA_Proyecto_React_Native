@@ -1,5 +1,5 @@
-import { apiClient } from './apiClient';
-import type { Activity, ActivityInput, PaginatedResponse } from '../models';
+import { ApiError, apiClient } from './apiClient';
+import type { Activity, ActivityInput, PaginatedResponse, UserRole } from '../models';
 
 export interface ActivityListParams {
   page?: number;
@@ -34,7 +34,7 @@ export async function getActivities(
       category: params.category,
       subcategory: params.subcategory,
       status: params.status,
-      showDeleted: params.showDeleted,
+      showDeleted: params.showDeleted ? 'true' : undefined,
     },
     signal,
   });
@@ -42,6 +42,17 @@ export async function getActivities(
     return { data: [], totalDocs: 0, totalPages: 0, currentPage: params.page ?? 1 };
   }
   return response;
+}
+
+export async function getJoinedActivities(
+  role: UserRole,
+  signal?: AbortSignal,
+): Promise<Activity[]> {
+  if (role !== 'USER') {
+    throw new ApiError('Solo los usuarios pueden consultar sus actividades inscritas.', 403);
+  }
+  const response = await apiClient<{ activities: Activity[] }>('/activities/joined', { signal });
+  return response?.activities ?? [];
 }
 
 export async function getActivity(id: string, signal?: AbortSignal): Promise<Activity> {
@@ -73,7 +84,10 @@ export async function joinActivity(id: string): Promise<Activity | null> {
   return response ? unwrapActivity(response) : null;
 }
 
-export async function leaveActivity(id: string): Promise<Activity | null> {
+export async function leaveActivity(id: string, role: UserRole): Promise<Activity | null> {
+  if (role !== 'USER') {
+    throw new ApiError('Solo los usuarios pueden cancelar una inscripción.', 403);
+  }
   const response = await apiClient<unknown>(
     `/activities/${encodeURIComponent(id)}/participants`,
     { method: 'DELETE' },

@@ -1,6 +1,7 @@
 import * as SecureStore from 'expo-secure-store';
 
 const REFRESH_TOKEN_KEY = 'ea.refreshToken';
+const ACCESS_TOKEN_KEY = 'ea.accessToken';
 
 let accessToken: string | null = null;
 let refreshToken: string | null = null;
@@ -36,6 +37,12 @@ export async function setSessionTokens(tokens: {
   accessToken: string | null;
   refreshToken: string | null;
 }): Promise<void> {
+  if (tokens.accessToken) {
+    await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, tokens.accessToken);
+  } else {
+    await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
+  }
+
   if (tokens.refreshToken) {
     await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refreshToken);
   } else {
@@ -53,7 +60,10 @@ export async function clearSessionTokens(): Promise<void> {
   refreshToken = null;
   refreshTokenLoad = Promise.resolve(null);
   notifyAccessTokenChanged();
-  await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+  await Promise.all([
+    SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
+    SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
+  ]);
 }
 
 export function onAccessTokenChanged(handler: (token: string | null) => void): () => void {

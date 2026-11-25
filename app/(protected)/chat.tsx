@@ -1,7 +1,13 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { useTheme } from '../../src/context/ThemeContext';
 
 export default function ChatScreen() {
-  return <View style={styles.container}><Text style={styles.label}>Chat</Text></View>;
+  const { colors } = useTheme();
+  return (
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <Text style={[styles.label, { color: colors.text }]}>Chat</Text>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({

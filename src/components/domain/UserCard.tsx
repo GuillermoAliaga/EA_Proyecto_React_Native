@@ -1,6 +1,6 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { User } from '../../models/user.model';
-import { theme } from '../../config/theme';
+import { useTheme } from '../../context/ThemeContext';
 import { AppBadge } from '../ui/AppBadge';
 import { AppCard } from '../ui/AppCard';
 import { AppButton } from '../ui/AppButton';
@@ -28,6 +28,7 @@ export function UserCard({
   onRestore,
   onDelete,
 }: UserCardProps) {
+  const { colors } = useTheme();
   return (
     <AppCard style={styles.card}>
       <View style={styles.heading}>
@@ -37,15 +38,19 @@ export function UserCard({
             accessibilityLabel={`Seleccionar usuario ${user.name}`}
             accessibilityState={{ checked: selected }}
             onPress={onSelect}
-            style={[styles.checkbox, selected && styles.checkboxSelected]}
+            style={[
+              styles.checkbox,
+              { borderColor: colors.textSecondary },
+              selected && { backgroundColor: colors.primary, borderColor: colors.primary },
+            ]}
           >
-            <Text style={styles.checkboxText}>{selected ? '✓' : ''}</Text>
+            <Text style={[styles.checkboxText, { color: colors.surface }]}>{selected ? '✓' : ''}</Text>
           </Pressable>
         ) : null}
-        <Text style={styles.name}>{user.name}</Text>
+        <Text style={[styles.name, { color: colors.text }]}>{user.name}</Text>
         <AppBadge label={user.role} />
       </View>
-      <Text style={styles.email}>{user.email}</Text>
+      <Text style={[styles.email, { color: colors.textSecondary }]}>{user.email}</Text>
       <View style={styles.badges}>
         {user.isBanned ? <AppBadge label="Baneado" /> : null}
         {user.deleted ? <AppBadge label="Archivado" /> : null}
@@ -84,19 +89,17 @@ export function UserCard({
 const styles = StyleSheet.create({
   card: { gap: 10 },
   heading: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 12 },
-  name: { flex: 1, color: theme.colors.text, fontSize: 17, fontWeight: '700' },
-  email: { marginTop: 8, color: theme.colors.textSecondary, fontSize: 14 },
+  name: { flex: 1, fontSize: 17, fontWeight: '700' },
+  email: { marginTop: 8, fontSize: 14 },
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   checkbox: {
     width: 24,
     height: 24,
     borderWidth: 1,
-    borderColor: theme.colors.textSecondary,
     borderRadius: 5,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  checkboxSelected: { backgroundColor: theme.colors.primary, borderColor: theme.colors.primary },
-  checkboxText: { color: theme.colors.surface, fontWeight: '700' },
+  checkboxText: { fontWeight: '700' },
 });

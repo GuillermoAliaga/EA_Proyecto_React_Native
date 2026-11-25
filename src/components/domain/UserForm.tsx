@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { useToast } from '../../context/ToastContext';
-import { theme } from '../../config/theme';
+import { useTheme } from '../../context/ThemeContext';
 import { ROLES } from '../../models/user.model';
 import type { User, UserInput, UserRole } from '../../models/user.model';
 import { createUser, getUser, updateUser } from '../../services/user.service';
@@ -18,6 +18,7 @@ const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 export function UserForm({ userId }: { userId?: string }) {
   const editing = Boolean(userId);
   const { showToast } = useToast();
+  const { colors } = useTheme();
   const [user, setUser] = useState<User | null>(null);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -117,9 +118,9 @@ export function UserForm({ userId }: { userId?: string }) {
         autoComplete="email"
       />
       <View style={styles.field}>
-        <Text style={styles.label}>Rol</Text>
-        <View style={styles.pickerWrap}>
-          <Picker selectedValue={role} onValueChange={(value: UserRole) => setRole(value)}>
+        <Text style={[styles.label, { color: colors.text }]}>Rol</Text>
+        <View style={[styles.pickerWrap, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+          <Picker style={{ color: colors.text }} selectedValue={role} onValueChange={(value: UserRole) => setRole(value)}>
             {ROLES.map((item) => <Picker.Item key={item} label={item} value={item} />)}
           </Picker>
         </View>
@@ -132,7 +133,7 @@ export function UserForm({ userId }: { userId?: string }) {
         autoComplete="new-password"
         placeholder={editing ? 'Dejar vacía para conservarla' : 'Mínimo 6 caracteres'}
       />
-      {formError ? <Text accessibilityRole="alert" style={styles.error}>{formError}</Text> : null}
+      {formError ? <Text accessibilityRole="alert" style={[styles.error, { color: colors.danger }]}>{formError}</Text> : null}
       <AppButton title={editing ? 'Guardar cambios' : 'Crear usuario'} onPress={() => void submit()} loading={saving} />
     </ScreenWrapper>
   );
@@ -140,15 +141,13 @@ export function UserForm({ userId }: { userId?: string }) {
 
 const styles = StyleSheet.create({
   field: { gap: 6 },
-  label: { color: theme.colors.text, fontSize: 14, fontWeight: '600' },
+  label: { fontSize: 14, fontWeight: '600' },
   pickerWrap: {
     minHeight: 48,
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: theme.colors.border,
     borderRadius: 10,
-    backgroundColor: theme.colors.surface,
     overflow: 'hidden',
   },
-  error: { color: theme.colors.danger, fontSize: 14 },
+  error: { fontSize: 14 },
 });
