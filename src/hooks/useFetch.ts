@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
+import { apiClient } from '../services/apiClient';
 
 interface FetchState<T> {
   data: T | null;
@@ -6,7 +7,11 @@ interface FetchState<T> {
   loading: boolean;
 }
 
-export function useFetch<T>(url: string): FetchState<T> & { refetch: () => void } {
+export function useFetch<T>(
+  path: string,
+  params?: Record<string, string | number | boolean | null | undefined>,
+): FetchState<T> & { refetch: () => void } {
+  const paramsKey = JSON.stringify(params);
   const [requestId, setRequestId] = useState(0);
   const [state, setState] = useState<FetchState<T>>({
     data: null,
@@ -20,13 +25,7 @@ export function useFetch<T>(url: string): FetchState<T> & { refetch: () => void 
     const controller = new AbortController();
     setState((current) => ({ ...current, loading: true, error: null }));
 
-    fetch(url, { signal: controller.signal })
-      .then(async (response) => {
-        if (!response.ok) {
-          throw new Error(`Error de solicitud: ${response.status} ${response.statusText}`);
-        }
-        return (await response.json()) as T;
-      })
+    apiClient<T>(path, { params, signal: controller.signal })
       .then((data) => setState({ data, error: null, loading: false }))
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
@@ -38,7 +37,7 @@ export function useFetch<T>(url: string): FetchState<T> & { refetch: () => void 
       });
 
     return () => controller.abort();
-  }, [url, requestId]);
+  }, [path, paramsKey, requestId]);
 
   return { ...state, refetch };
 }
