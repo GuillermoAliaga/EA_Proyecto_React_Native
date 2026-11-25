@@ -9,7 +9,7 @@ export type ReportStatus = (typeof REPORT_STATUSES)[number];
 
 export interface Report {
   _id: string;
-  author?: string;
+  reporterId?: string;
   targetType: TargetType;
   targetId: string;
   reason: ReportReason;

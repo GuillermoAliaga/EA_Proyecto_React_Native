@@ -42,11 +42,15 @@ export default function ProtectedLayout() {
       />
       <Tabs.Screen name="chat" options={{ title: 'Chat', tabBarLabel: 'Chat' }} />
       <Tabs.Screen
-        name="reports/index"
+        name="reports/new"
         options={{ title: 'Denunciar', tabBarLabel: 'Denunciar' }}
       />
-      <Tabs.Screen name="users/index" options={{ href: null, title: 'Gestión de usuarios' }} />
+      <Tabs.Screen name="reports/index" options={{ href: null, title: 'Gestión de denuncias' }} />
+      <Tabs.Screen name="reports/[id]/edit" options={{ href: null, title: 'Revisión de denuncia' }} />
       <Tabs.Screen name="reports/review" options={{ href: null, title: 'Revisión de denuncias' }} />
+      <Tabs.Screen name="users/index" options={{ href: null, title: 'Gestión de usuarios' }} />
+      <Tabs.Screen name="users/new" options={{ href: null, title: 'Nuevo usuario' }} />
+      <Tabs.Screen name="users/[id]/edit" options={{ href: null, title: 'Editar usuario' }} />
     </Tabs>
   );
 }

@@ -1,15 +1,9 @@
-import { Header } from '../../../src/components/layout/Header';
-import { ScreenWrapper } from '../../../src/components/layout/ScreenWrapper';
+import { Redirect } from 'expo-router';
 import { LoadingView } from '../../../src/components/ui/StateViews';
 import { useRequireRole } from '../../../src/hooks/useRequireRole';
 
-export default function ReportReviewScreen() {
+export default function ReportReviewRedirect() {
   const isAdmin = useRequireRole(['ADMIN']);
   if (!isAdmin) return <LoadingView />;
-
-  return (
-    <ScreenWrapper>
-      <Header title="Revisión de denuncias" />
-    </ScreenWrapper>
-  );
+  return <Redirect href="/(protected)/reports" />;
 }

@@ -12,7 +12,7 @@ export function AdminMenu({ role }: { role: UserRole }) {
           <Text style={styles.text}>Usuarios</Text>
         </Pressable>
       </Link>
-      <Link href="/(protected)/reports/review" asChild>
+      <Link href="/(protected)/reports" asChild>
         <Pressable accessibilityRole="button" style={styles.link}>
           <Text style={styles.text}>Denuncias</Text>
         </Pressable>
