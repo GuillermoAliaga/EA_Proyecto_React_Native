@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 
 const REFRESH_TOKEN_KEY = 'ea.refreshToken';
@@ -8,6 +9,33 @@ let refreshToken: string | null = null;
 let refreshTokenLoad: Promise<string | null> | null = null;
 const sessionExpiredHandlers = new Set<() => void>();
 const accessTokenHandlers = new Set<(token: string | null) => void>();
+
+async function readStorageItem(key: string): Promise<string | null> {
+  if (Platform.OS === 'web') {
+    return typeof window !== 'undefined' ? window.localStorage.getItem(key) : null;
+  }
+  return SecureStore.getItemAsync(key);
+}
+
+async function writeStorageItem(key: string, value: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(key, value);
+    }
+    return;
+  }
+  await SecureStore.setItemAsync(key, value);
+}
+
+async function removeStorageItem(key: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(key);
+    }
+    return;
+  }
+  await SecureStore.deleteItemAsync(key);
+}
 
 function notifyAccessTokenChanged(): void {
   for (const handler of accessTokenHandlers) handler(accessToken);
@@ -20,7 +48,7 @@ export function getAccessToken(): string | null {
 export async function getRefreshToken(): Promise<string | null> {
   if (refreshTokenLoad) return refreshTokenLoad;
 
-  refreshTokenLoad = SecureStore.getItemAsync(REFRESH_TOKEN_KEY)
+  refreshTokenLoad = readStorageItem(REFRESH_TOKEN_KEY)
     .then((storedToken) => {
       refreshToken = storedToken;
       return storedToken;
@@ -38,15 +66,15 @@ export async function setSessionTokens(tokens: {
   refreshToken: string | null;
 }): Promise<void> {
   if (tokens.accessToken) {
-    await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, tokens.accessToken);
+    await writeStorageItem(ACCESS_TOKEN_KEY, tokens.accessToken);
   } else {
-    await SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY);
+    await removeStorageItem(ACCESS_TOKEN_KEY);
   }
 
   if (tokens.refreshToken) {
-    await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refreshToken);
+    await writeStorageItem(REFRESH_TOKEN_KEY, tokens.refreshToken);
   } else {
-    await SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY);
+    await removeStorageItem(REFRESH_TOKEN_KEY);
   }
 
   accessToken = tokens.accessToken;
@@ -61,8 +89,8 @@ export async function clearSessionTokens(): Promise<void> {
   refreshTokenLoad = Promise.resolve(null);
   notifyAccessTokenChanged();
   await Promise.all([
-    SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
-    SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
+    removeStorageItem(ACCESS_TOKEN_KEY),
+    removeStorageItem(REFRESH_TOKEN_KEY),
   ]);
 }
 
