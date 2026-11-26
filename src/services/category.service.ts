@@ -1,28 +1,29 @@
-import { CATEGORIES, SUBCATEGORIES } from '../models/activity.model';
-import { apiClient } from './apiClient';
+import { ApiError, apiClient } from './apiClient';
 
 export interface CategoryOption {
   _id?: string;
   name: string;
   slug: string;
   subcategories: { name: string; slug: string }[];
+  deleted?: boolean;
 }
 
-export const FALLBACK_CATEGORIES: CategoryOption[] = [
+// These definitions match the backend's getSeedCategories() data.
+const INITIAL_BACKEND_CATEGORIES = [
   {
-    name: 'Sport',
-    slug: CATEGORIES[0],
+    name: 'Deportes',
+    slug: 'SPORT',
     subcategories: [
-      { name: 'Baloncesto', slug: SUBCATEGORIES[0] },
-      { name: 'Running', slug: SUBCATEGORIES[1] },
+      { name: 'Baloncesto', slug: 'BASKETBALL' },
+      { name: 'Running', slug: 'RUNNING' },
     ],
   },
   {
     name: 'Ocio',
-    slug: CATEGORIES[1],
+    slug: 'LEISURE',
     subcategories: [
-      { name: 'Arcade', slug: SUBCATEGORIES[2] },
-      { name: 'Juegos de mesa y TCG', slug: SUBCATEGORIES[3] },
+      { name: 'Arcade', slug: 'ARCADE' },
+      { name: 'Juegos de mesa y TCG', slug: 'TCG_BOARDGAMES' },
     ],
   },
 ];
@@ -62,25 +63,42 @@ function normalizeCategory(value: unknown): CategoryOption | null {
     name,
     slug,
     subcategories,
+    ...(typeof record?.deleted === 'boolean' ? { deleted: record.deleted } : {}),
   };
 }
 
-export async function getCategories(signal?: AbortSignal): Promise<CategoryOption[]> {
-  try {
-    const response = await apiClient<unknown>('/categories', { signal });
-    const record = recordOf(response);
-    const values = Array.isArray(response)
-      ? response
-      : Array.isArray(record?.data)
-        ? record.data
-        : Array.isArray(record?.items)
-          ? record.items
-          : [];
-    const categories = values
-      .map(normalizeCategory)
-      .filter((item): item is CategoryOption => item !== null);
-    return categories.length ? categories : FALLBACK_CATEGORIES;
-  } catch {
-    return FALLBACK_CATEGORIES;
+export async function getCategories(
+  signal?: AbortSignal,
+): Promise<CategoryOption[]> {
+  const response = await apiClient<unknown>('/categories', { signal });
+  const record = recordOf(response);
+  const values = Array.isArray(response)
+    ? response
+    : Array.isArray(record?.data)
+      ? record.data
+      : Array.isArray(record?.items)
+        ? record.items
+        : [];
+  return values
+    .map(normalizeCategory)
+    .filter((item): item is CategoryOption => item !== null && item.deleted !== true);
+}
+
+/** Creates missing built-in categories through the admin-only backend endpoint. */
+export async function initializeDefaultCategories(): Promise<CategoryOption[]> {
+  let categories = await getCategories();
+
+  for (const definition of INITIAL_BACKEND_CATEGORIES) {
+    if (categories.some((category) => category.slug === definition.slug)) continue;
+
+    try {
+      await apiClient('/categories', { method: 'POST', body: definition });
+    } catch (error) {
+      // Another admin may have created the category at the same time.
+      if (!(error instanceof ApiError && error.status === 409)) throw error;
+    }
+    categories = await getCategories();
   }
+
+  return categories;
 }

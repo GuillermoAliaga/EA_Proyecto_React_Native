@@ -74,5 +74,15 @@ export interface Activity {
 
 export type ActivityInput = Omit<
   Activity,
-  '_id' | 'creatorId' | 'participants' | 'deleted' | 'deletedAt' | 'createdAt' | 'updatedAt'
->;
+  '_id' | 'creatorId' | 'participants' | 'deleted' | 'deletedAt' | 'createdAt' | 'updatedAt' | 'location' | 'capacity' | 'pricing' | 'modality' | 'status'
+> & {
+  modality?: Modality;
+  status?: ActivityStatus;
+  location: Omit<ActivityLocation, 'coordinates' | 'type' | 'isStoreLocation'> & {
+    type?: 'Point';
+    coordinates?: [number, number];
+    isStoreLocation?: boolean;
+  };
+  capacity: { maxParticipants: number; minParticipants?: number };
+  pricing?: ActivityPricing;
+};

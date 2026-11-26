@@ -4,6 +4,7 @@ import { Picker } from '@react-native-picker/picker';
 import { router } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   Platform,
   Pressable,
   StyleSheet,
@@ -13,9 +14,12 @@ import {
 } from 'react-native';
 import type { Activity, ActivityInput, Modality } from '../../models/activity.model';
 import { MODALITIES } from '../../models/activity.model';
+import { ApiError } from '../../services/apiClient';
+import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { getCategories } from '../../services/category.service';
 import type { CategoryOption } from '../../services/category.service';
+import { initializeDefaultCategories } from '../../services/category.service';
 import { createActivity, getActivity, updateActivity } from '../../services/activity.service';
 import { AppButton } from '../ui/AppButton';
 import { AppInput } from '../ui/AppInput';
@@ -24,6 +28,7 @@ import { Header } from '../layout/Header';
 import { ScreenWrapper } from '../layout/ScreenWrapper';
 import { useToast } from '../../context/ToastContext';
 import { useDebounce } from '../../hooks/useDebounce';
+import { categoryLabel, subcategoryLabel } from '../../utils/category-labels';
 
 interface ActivityFormProps {
   activityId?: string;
@@ -86,12 +91,18 @@ function formatDateTime(date: Date): string {
 
 export function ActivityForm({ activityId }: ActivityFormProps) {
   const editing = Boolean(activityId);
+  const { user } = useAuth();
   const { showToast } = useToast();
   const { colors } = useTheme();
   const [activity, setActivity] = useState<Activity | null>(null);
   const [loadingActivity, setLoadingActivity] = useState(editing);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
+  const [loadingCategories, setLoadingCategories] = useState(true);
+  const [categoryLoadError, setCategoryLoadError] = useState<string | null>(null);
+  const [categoriesMissing, setCategoriesMissing] = useState(false);
+  const [initializingCategories, setInitializingCategories] = useState(false);
+  const [categoryLoadAttempt, setCategoryLoadAttempt] = useState(0);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -104,7 +115,7 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
   const [isStoreLocation, setIsStoreLocation] = useState(false);
   const [startTime, setStartTime] = useState(() => new Date(Date.now() + 60 * 60 * 1000));
   const [endTime, setEndTime] = useState(() => new Date(Date.now() + 2 * 60 * 60 * 1000));
-  const [minParticipants, setMinParticipants] = useState('2');
+  const [minParticipants, setMinParticipants] = useState('');
   const [maxParticipants, setMaxParticipants] = useState('10');
   const [price, setPrice] = useState('0');
   const [datePicker, setDatePicker] = useState<{ target: DateTarget; mode: DateMode } | null>(null);
@@ -124,11 +135,75 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
 
   useEffect(() => {
     const controller = new AbortController();
-    void getCategories(controller.signal).then((result) => {
-      if (!controller.signal.aborted) setCategories(result);
-    });
+    setLoadingCategories(true);
+    setCategoryLoadError(null);
+    void (async () => {
+      try {
+        const result = await getCategories(controller.signal);
+        if (controller.signal.aborted) return;
+
+        const activeCategories = result.filter((item) => !item.deleted);
+        setCategories(activeCategories);
+        if (activeCategories.length === 0) {
+          setCategoriesMissing(true);
+          setCategoryLoadError(
+            'Todavía no hay opciones configuradas. Un administrador puede cargar las opciones iniciales para continuar.',
+          );
+          return;
+        }
+        setCategoriesMissing(false);
+        setCategoryLoadError(null);
+        if (!activityId) {
+          setCategory((prev) => prev || activeCategories[0].slug);
+          if (activeCategories[0].subcategories.length > 0) {
+            setSubcategory((prev) => prev || activeCategories[0].subcategories[0].slug);
+          }
+        }
+      } catch (error: unknown) {
+        if (controller.signal.aborted) return;
+        setCategories([]);
+        setCategoriesMissing(false);
+        setCategoryLoadError(
+          error instanceof Error ? error.message : 'No se pudieron cargar las categorías.',
+        );
+      } finally {
+        if (!controller.signal.aborted) setLoadingCategories(false);
+      }
+    })();
     return () => controller.abort();
-  }, []);
+  }, [activityId, categoryLoadAttempt]);
+
+  const loadInitialCategories = async () => {
+    if (user?.role !== 'ADMIN' || initializingCategories) return;
+    setInitializingCategories(true);
+    setLoadingCategories(true);
+    setCategoryLoadError(null);
+    try {
+      const loadedCategories = await initializeDefaultCategories();
+      const activeCategories = loadedCategories.filter((item) => !item.deleted);
+      setCategories(activeCategories);
+      if (activeCategories.length === 0) {
+        setCategoriesMissing(true);
+        setCategoryLoadError('El backend no confirmó la carga de las opciones iniciales.');
+        return;
+      }
+      setCategoriesMissing(false);
+      setCategory(activeCategories[0].slug);
+      setSubcategory(activeCategories[0].subcategories[0]?.slug ?? '');
+      showToast('Opciones iniciales cargadas desde el backend.');
+    } catch (error: unknown) {
+      setCategoryLoadError(
+        error instanceof ApiError && error.status > 0
+          ? `HTTP ${error.status}: ${error.message}`
+          : error instanceof Error
+            ? error.message
+            : 'No se pudieron cargar las opciones iniciales.',
+      );
+    } finally {
+      setInitializingCategories(false);
+      setLoadingCategories(false);
+    }
+  };
 
   useEffect(() => {
     if (!activityId) return;
@@ -139,8 +214,8 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
         setActivity(result);
         setTitle(result.title);
         setDescription(result.description);
-        setCategory(result.category);
-        setSubcategory(result.subcategory);
+        setCategory(result.category.toUpperCase());
+        setSubcategory(result.subcategory.toUpperCase());
         setModality(result.modality);
         setAddress(result.location.addressName);
         setSelectedAddress(result.location.addressName);
@@ -241,49 +316,60 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
     if (Platform.OS === 'android') setDatePicker(null);
   };
 
+  const failValidation = (message: string) => {
+    setFormError(message);
+    Alert.alert('Revisa los datos', message);
+  };
+
   const handleSubmit = async () => {
-    const minCount = Number(minParticipants);
+    const minCount = minParticipants.trim() ? Number(minParticipants) : undefined;
     const maxCount = Number(maxParticipants);
-    const activityPrice = Number(price.replace(',', '.'));
+    const activityPrice = price.trim() ? Number(price.replace(',', '.')) : undefined;
 
     if (!title.trim() || !description.trim()) {
-      setFormError('El título y la descripción son obligatorios.');
+      failValidation('El título y la descripción son obligatorios.');
       return;
     }
     if (!category || !subcategory) {
-      setFormError('Selecciona una categoría y una subcategoría.');
+      failValidation('Selecciona una categoría y una subcategoría.');
+      return;
+    }
+    const validCategory = categories.find((item) => item.slug === category);
+    if (!validCategory?.subcategories.some((item) => item.slug === subcategory)) {
+      failValidation('La categoría o subcategoría seleccionada ya no está activa en el backend. Actualiza las categorías e inténtalo de nuevo.');
       return;
     }
     if (address.trim().length < 2 || address.trim().length > 200) {
-      setFormError('La dirección debe tener entre 2 y 200 caracteres.');
+      failValidation('La dirección debe tener entre 2 y 200 caracteres.');
       return;
     }
-    if (
-      !coordinates ||
-      coordinates.length !== 2 ||
-      !coordinates.every((coordinate) => Number.isFinite(coordinate)) ||
-      coordinates[0] < -180 ||
-      coordinates[0] > 180 ||
-      coordinates[1] < -90 ||
-      coordinates[1] > 90
-    ) {
-      setFormError('Selecciona una dirección válida de la lista de sugerencias.');
+
+    const hasValidCoordinates = Boolean(
+      coordinates &&
+      coordinates.length === 2 &&
+      coordinates.every((coordinate) => Number.isFinite(coordinate)) &&
+      coordinates[0] >= -180 && coordinates[0] <= 180 &&
+      coordinates[1] >= -90 && coordinates[1] <= 90,
+    );
+    if (coordinates && !hasValidCoordinates) {
+      failValidation('Las coordenadas deben estar dentro del rango válido de longitud y latitud.');
       return;
     }
+
     if (endTime.getTime() <= startTime.getTime()) {
-      setFormError('La fecha y hora de fin debe ser posterior al inicio.');
+      failValidation('La fecha y hora de fin debe ser posterior al inicio.');
       return;
     }
-    if (!Number.isInteger(minCount) || minCount < 1) {
-      setFormError('El aforo mínimo debe ser un número entero de al menos 1.');
+    if (minCount !== undefined && (!Number.isInteger(minCount) || minCount < 1)) {
+      failValidation('El aforo mínimo debe ser un número entero de al menos 1, o dejarse vacío.');
       return;
     }
-    if (!Number.isInteger(maxCount) || maxCount < minCount) {
-      setFormError('El aforo máximo debe ser un entero igual o superior al mínimo.');
+    if (!Number.isInteger(maxCount) || maxCount < 1 || (minCount !== undefined && maxCount < minCount)) {
+      failValidation('El aforo máximo debe ser un entero de al menos 1 e igual o superior al mínimo indicado.');
       return;
     }
-    if (!price.trim() || !Number.isFinite(activityPrice) || activityPrice < 0) {
-      setFormError('El precio debe ser un número igual o superior a 0.');
+    if (activityPrice !== undefined && (!Number.isFinite(activityPrice) || activityPrice < 0)) {
+      failValidation('El precio debe ser un número igual o superior a 0, o dejarse vacío.');
       return;
     }
 
@@ -296,7 +382,7 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
       status: activity?.status ?? 'OPEN',
       location: {
         type: 'Point',
-        coordinates: [coordinates[0], coordinates[1]],
+        ...(hasValidCoordinates && coordinates ? { coordinates } : {}),
         addressName: address.trim(),
         isStoreLocation: Boolean(isStoreLocation),
       },
@@ -305,10 +391,10 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
         endTime: endTime.toISOString(),
       },
       capacity: {
-        minParticipants: minCount,
         maxParticipants: maxCount,
+        ...(minCount !== undefined ? { minParticipants: minCount } : {}),
       },
-      pricing: { price: activityPrice },
+      ...(activityPrice !== undefined ? { pricing: { price: activityPrice } } : {}),
     };
 
     setSaving(true);
@@ -317,9 +403,15 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
       if (activityId) await updateActivity(activityId, payload);
       else await createActivity(payload);
       showToast(activityId ? 'Actividad actualizada.' : 'Actividad creada.');
-      router.back();
+      router.replace('/activities');
     } catch (error) {
-      setFormError(error instanceof Error ? error.message : 'No se pudo guardar la actividad.');
+      const message = error instanceof ApiError && error.status > 0
+        ? `HTTP ${error.status}: ${error.message}`
+        : error instanceof Error
+          ? error.message
+          : 'No se pudo guardar la actividad.';
+      setFormError(message);
+      Alert.alert('Error al guardar', message);
     } finally {
       setSaving(false);
     }
@@ -358,17 +450,46 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
             selectedValue={category}
             onValueChange={(value: string) => {
               setCategory(value);
-              setSubcategory('');
+              const found = categories.find((item) => item.slug === value);
+              setSubcategory(found?.subcategories[0]?.slug ?? '');
             }}
             style={[styles.picker, { color: colors.text }]}
           >
-            <Picker.Item label="Selecciona una categoría" value="" />
+            {categories.length === 0 ? (
+              <Picker.Item
+                label={loadingCategories ? 'Cargando opciones...' : 'Opciones no disponibles'}
+                value=""
+              />
+            ) : null}
             {categories.map((item) => (
-              <Picker.Item key={item.slug} label={item.name} value={item.slug} />
+              <Picker.Item key={item.slug} label={categoryLabel(item.slug, item.name)} value={item.slug} />
             ))}
           </Picker>
         </View>
       </View>
+      {categoryLoadError ? (
+        <View style={styles.categoryError}>
+          <Text accessibilityRole="alert" style={[styles.error, { color: colors.danger }]}>
+            {categoryLoadError}
+          </Text>
+          {categoriesMissing && user?.role === 'ADMIN' ? (
+            <AppButton
+              title="Cargar opciones iniciales"
+              variant="secondary"
+              loading={initializingCategories}
+              disabled={loadingCategories}
+              onPress={() => void loadInitialCategories()}
+            />
+          ) : (
+            <AppButton
+              title="Actualizar categorías"
+              variant="secondary"
+              disabled={loadingCategories}
+              onPress={() => setCategoryLoadAttempt((attempt) => attempt + 1)}
+            />
+          )}
+        </View>
+      ) : null}
       <View style={styles.field}>
         <Text style={[styles.label, { color: colors.text }]}>Subcategoría</Text>
         <View style={[styles.pickerWrap, { borderColor: colors.border, backgroundColor: colors.surface }]}>
@@ -378,9 +499,11 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
             onValueChange={(value: string) => setSubcategory(value)}
             style={[styles.picker, { color: colors.text }]}
           >
-            <Picker.Item label="Selecciona una subcategoría" value="" />
+            {!selectedCategory?.subcategories.length ? (
+              <Picker.Item label="Sin subcategorías" value="" />
+            ) : null}
             {selectedCategory?.subcategories.map((item) => (
-              <Picker.Item key={item.slug} label={item.name} value={item.slug} />
+              <Picker.Item key={item.slug} label={subcategoryLabel(item.slug, item.name)} value={item.slug} />
             ))}
           </Picker>
         </View>
@@ -410,7 +533,9 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
       {coordinates ? (
         <Text style={[styles.selectedAddress, { color: colors.primary }]}>Ubicación seleccionada</Text>
       ) : address.trim().length >= 3 ? (
-        <Text style={[styles.locationHint, { color: colors.textSecondary }]}>Selecciona un resultado para fijar las coordenadas.</Text>
+        <Text style={[styles.locationHint, { color: colors.textSecondary }]}>
+          Pulsa una sugerencia para fijar coordenadas exactas (opcional).
+        </Text>
       ) : null}
       {loadingSuggestions ? <Text style={[styles.locationHint, { color: colors.textSecondary }]}>Buscando direcciones...</Text> : null}
       {suggestionError ? (
@@ -483,10 +608,11 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
 
       <View style={styles.numericRow}>
         <AppInput
-          label="Aforo mínimo"
+          label="Aforo mínimo (opcional)"
           value={minParticipants}
           onChangeText={setMinParticipants}
           keyboardType="number-pad"
+          placeholder="Por defecto: 2"
         />
         <AppInput
           label="Aforo máximo"
@@ -496,7 +622,7 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
         />
       </View>
       <AppInput
-        label="Precio (€)"
+        label="Precio (€) (opcional)"
         value={price}
         onChangeText={setPrice}
         keyboardType="decimal-pad"
@@ -506,7 +632,7 @@ export function ActivityForm({ activityId }: ActivityFormProps) {
         title={editing ? 'Guardar cambios' : 'Crear actividad'}
         onPress={() => void handleSubmit()}
         loading={saving}
-        disabled={saving}
+        disabled={saving || loadingCategories || categories.length === 0}
       />
     </ScreenWrapper>
   );
@@ -538,4 +664,5 @@ const styles = StyleSheet.create({
   pickerSection: { padding: 8, borderRadius: 10 },
   numericRow: { flexDirection: 'row', gap: 10 },
   error: { fontSize: 14 },
+  categoryError: { gap: 8 },
 });

@@ -55,9 +55,17 @@ El tema claro/oscuro sigue la preferencia del dispositivo por defecto y permite 
 desde Inicio. La preferencia se guarda con AsyncStorage; las credenciales de sesión siguen usando
 `expo-secure-store`.
 
-Inicio muestra un resumen, próximas actividades y sus ubicaciones en el mapa. Las tarjetas y los
-marcadores permiten inscribirse o cancelar la inscripción. El listado de actividades, denuncias y
-usuarios incluye sus filtros y acciones administrativas correspondientes.
+Inicio muestra un resumen, próximas actividades y sus ubicaciones en el mapa. En el listado de
+actividades se puede alternar entre tarjetas y mapa; ambos permiten inscribirse o cancelar la
+inscripción. Los listados de actividades, denuncias y usuarios incluyen sus filtros y acciones
+administrativas correspondientes.
+
+El chat consulta `GET /users/chat-users` para mostrar los contactos y conecta Socket.IO en la misma
+URL base de la API, enviando el access token en `auth.token`. Usa `users:online` para la presencia,
+`chat:join` para unirse a una sala, `chat:history` para cargar los últimos mensajes y
+`chat:message` para enviar y recibir mensajes. Las conversaciones directas usan
+`direct:<idMenor>:<idMayor>`; para un grupo, introduce su identificador y la app se une a
+`group:<id>`. El acceso a cada sala sigue sujeto a las reglas del backend.
 
 La app llama a `DELETE /activities/:activityId/participants` para cancelar una inscripción. Esa ruta
 no aparece en el contrato de rutas del backend revisado; debe implementarse allí para que
