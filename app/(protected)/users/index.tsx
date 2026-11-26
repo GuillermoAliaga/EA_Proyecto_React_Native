@@ -24,7 +24,7 @@ import {
   softDeleteUser,
 } from '../../../src/services/user.service';
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 
 type RouteParams = {
   search?: string | string[];
@@ -60,6 +60,7 @@ export default function UsersScreen() {
   const [searchText, setSearchText] = useState(search);
   const debouncedSearch = useDebounce(searchText, 400);
   const [users, setUsers] = useState<User[]>([]);
+  const [totalUsers, setTotalUsers] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -92,12 +93,15 @@ export default function UsersScreen() {
     setError(null);
     void getUsers(query, controller.signal)
       .then((result) => {
-        setUsers(result.data);
-        setTotalPages(result.totalPages);
+        const list = Array.isArray(result) ? result : (result?.data ?? []);
+        setUsers(list);
+        setTotalUsers(result?.totalDocs ?? list.length);
+        setTotalPages(result?.totalPages ?? (list.length > 0 ? 1 : 0));
       })
       .catch((requestError: unknown) => {
         if (!controller.signal.aborted) {
           setUsers([]);
+          setTotalUsers(0);
           setTotalPages(0);
           setError(requestError instanceof Error ? requestError.message : 'No se pudieron cargar los usuarios.');
         }
@@ -156,10 +160,10 @@ export default function UsersScreen() {
 
   if (!isAdmin) return <LoadingView />;
 
-  return (
-    <ScreenWrapper>
-      <Header title="Gestión de usuarios" subtitle="Administración (ADMIN)" />
-      <AppButton title="+ Nuevo usuario" onPress={() => router.push('/(protected)/users/new')} />
+  const listHeader = (
+    <View style={styles.headerBlock}>
+      <Header title="Gestión de usuarios" subtitle={`${totalUsers} usuarios registrados · Administración`} />
+      <AppButton title="+ Nuevo usuario" onPress={() => router.push('/users/new')} />
       <AppInput
         label="Buscar"
         placeholder="Nombre o email"
@@ -233,72 +237,84 @@ export default function UsersScreen() {
           />
         </View>
       ) : null}
-      {error && !loading ? (
-        <ErrorView
-          title="No se pudieron cargar los usuarios"
-          description={error}
-          onRetry={() => setReloadKey((key) => key + 1)}
-        />
-      ) : loading && users.length === 0 ? (
-        <LoadingView title="Cargando usuarios..." />
-      ) : (
-        <FlatList
-          style={styles.list}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={loading}
-              onRefresh={() => setReloadKey((key) => key + 1)}
-              tintColor={colors.primary}
+    </View>
+  );
+
+  return (
+    <ScreenWrapper>
+      <FlatList
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={() => setReloadKey((key) => key + 1)}
+            tintColor={colors.primary}
+          />
+        }
+        data={error || (loading && users.length === 0) ? [] : users}
+        keyExtractor={(item) => item._id}
+        ListHeaderComponent={listHeader}
+        renderItem={({ item }) => {
+          const isCurrentUser = item._id === currentUser?._id;
+          return (
+            <UserCard
+              user={item}
+              isCurrentUser={isCurrentUser}
+              selected={selectedIds.includes(item._id)}
+              busy={busyId === item._id}
+              onSelect={!isCurrentUser ? () => toggleSelected(item._id) : undefined}
+              onEdit={() => router.push({
+                pathname: '/users/[id]/edit',
+                params: { id: item._id },
+              })}
+              onArchive={!item.deleted ? () => confirmAction(
+                'Archivar usuario',
+                `¿Archivar la cuenta de ${item.name}?`,
+                () => void runMutation(item._id, () => softDeleteUser(item._id), 'Usuario archivado.'),
+              ) : undefined}
+              onRestore={!isCurrentUser && item.deleted
+                ? () => void runMutation(item._id, () => restoreUser(item._id), 'Usuario restaurado.')
+                : undefined}
+              onDelete={() => confirmAction(
+                'Eliminar usuario',
+                `¿Eliminar definitivamente la cuenta de ${item.name}? Esta acción no se puede deshacer.`,
+                () => void runMutation(item._id, () => deleteUser(item._id), 'Usuario eliminado.'),
+              )}
             />
-          }
-          data={users}
-          keyExtractor={(item) => item._id}
-          renderItem={({ item }) => {
-            const isCurrentUser = item._id === currentUser?._id;
-            return (
-              <UserCard
-                user={item}
-                isCurrentUser={isCurrentUser}
-                selected={selectedIds.includes(item._id)}
-                busy={busyId === item._id}
-                onSelect={!isCurrentUser ? () => toggleSelected(item._id) : undefined}
-                onEdit={() => router.push({
-                  pathname: '/(protected)/users/[id]/edit',
-                  params: { id: item._id },
-                })}
-                onArchive={!item.deleted ? () => confirmAction(
-                  'Archivar usuario',
-                  `¿Archivar la cuenta de ${item.name}?`,
-                  () => void runMutation(item._id, () => softDeleteUser(item._id), 'Usuario archivado.'),
-                ) : undefined}
-                onRestore={!isCurrentUser && item.deleted
-                  ? () => void runMutation(item._id, () => restoreUser(item._id), 'Usuario restaurado.')
-                  : undefined}
-                onDelete={() => confirmAction(
-                  'Eliminar usuario',
-                  `¿Eliminar definitivamente la cuenta de ${item.name}? Esta acción no se puede deshacer.`,
-                  () => void runMutation(item._id, () => deleteUser(item._id), 'Usuario eliminado.'),
-                )}
-              />
-            );
-          }}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          ListEmptyComponent={<EmptyView title="No hay usuarios" description="No hay resultados para los filtros seleccionados." />}
-          ListFooterComponent={
+          );
+        }}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ListEmptyComponent={
+          error && !loading ? (
+            <ErrorView
+              title="No se pudieron cargar los usuarios"
+              description={error}
+              onRetry={() => setReloadKey((key) => key + 1)}
+            />
+          ) : loading ? (
+            <LoadingView title="Cargando usuarios..." />
+          ) : (
+            <EmptyView title="No hay usuarios" description="No hay resultados para los filtros seleccionados." />
+          )
+        }
+        ListFooterComponent={
+          users.length > 0 ? (
             <View style={styles.pagination}>
               <AppButton title="Anterior" variant="secondary" disabled={page <= 1} onPress={() => router.setParams({ page: String(page - 1) })} />
               <Text style={[styles.pageLabel, { color: colors.textSecondary }]}>Página {page} de {Math.max(totalPages, 1)}</Text>
               <AppButton title="Siguiente" variant="secondary" disabled={totalPages === 0 || page >= totalPages} onPress={() => router.setParams({ page: String(page + 1) })} />
             </View>
-          }
-        />
-      )}
+          ) : undefined
+        }
+      />
     </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
+  headerBlock: { gap: 12, marginBottom: 12 },
   filters: { flexDirection: 'row', gap: 8 },
   pickerWrap: {
     flex: 1,
@@ -313,7 +329,7 @@ const styles = StyleSheet.create({
   bulkActions: { gap: 8 },
   selectedLabel: { fontWeight: '600' },
   list: { flex: 1 },
-  listContent: { flexGrow: 1, paddingBottom: 16 },
+  listContent: { flexGrow: 1, paddingBottom: 24 },
   separator: { height: 12 },
   pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 16 },
   pageLabel: { fontSize: 13 },

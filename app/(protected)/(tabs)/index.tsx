@@ -2,24 +2,25 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Picker } from '@react-native-picker/picker';
 import { router } from 'expo-router';
 import { StyleSheet, Text, View } from 'react-native';
-import { ActivitiesMap } from '../../src/components/domain/ActivitiesMap';
-import { ActivityCard } from '../../src/components/domain/ActivityCard';
-import { Header } from '../../src/components/layout/Header';
-import { ScreenWrapper } from '../../src/components/layout/ScreenWrapper';
-import { AppButton } from '../../src/components/ui/AppButton';
-import { AppCard } from '../../src/components/ui/AppCard';
-import { ErrorView, LoadingView } from '../../src/components/ui/StateViews';
-import { useAuth } from '../../src/context/AuthContext';
-import { useTheme } from '../../src/context/ThemeContext';
-import type { ThemeMode } from '../../src/context/ThemeContext';
-import { useToast } from '../../src/context/ToastContext';
-import type { Activity } from '../../src/models';
+import { ActivitiesMap } from '../../../src/components/domain/ActivitiesMap';
+import { ActivityCard } from '../../../src/components/domain/ActivityCard';
+import { Header } from '../../../src/components/layout/Header';
+import { ScreenWrapper } from '../../../src/components/layout/ScreenWrapper';
+import { AppButton } from '../../../src/components/ui/AppButton';
+import { AppCard } from '../../../src/components/ui/AppCard';
+import { ErrorView, LoadingView } from '../../../src/components/ui/StateViews';
+import { useAuth } from '../../../src/context/AuthContext';
+import { useTheme } from '../../../src/context/ThemeContext';
+import type { ThemeMode } from '../../../src/context/ThemeContext';
+import { useToast } from '../../../src/context/ToastContext';
+import type { Activity } from '../../../src/models';
+import { categoryLabel } from '../../../src/utils/category-labels';
 import {
   getActivities,
   getJoinedActivities,
   joinActivity,
   leaveActivity,
-} from '../../src/services/activity.service';
+} from '../../../src/services/activity.service';
 
 const HOME_LIMIT = 30;
 type MapCategory = 'ALL' | 'SPORT' | 'LEISURE';
@@ -198,7 +199,7 @@ export default function HomeScreen() {
         <AppButton
           title="Ver todas"
           variant="ghost"
-          onPress={() => router.push('/(protected)/activities')}
+          onPress={() => router.push('/activities')}
         />
       </View>
       <View style={[styles.themePicker, { borderColor: colors.border, backgroundColor: colors.surface }]}>
@@ -209,8 +210,8 @@ export default function HomeScreen() {
           style={{ color: colors.text }}
         >
           <Picker.Item label={`Todas (${activities.length})`} value="ALL" />
-          <Picker.Item label="Deporte" value="SPORT" />
-          <Picker.Item label="Ocio" value="LEISURE" />
+          <Picker.Item label={categoryLabel('SPORT')} value="SPORT" />
+          <Picker.Item label={categoryLabel('LEISURE')} value="LEISURE" />
         </Picker>
       </View>
       <ActivitiesMap
@@ -252,7 +253,7 @@ export default function HomeScreen() {
       <AppButton
         title="Explorar actividades"
         variant="secondary"
-        onPress={() => router.push('/(protected)/activities')}
+        onPress={() => router.push('/activities')}
       />
 
       <View style={styles.themeRow}>

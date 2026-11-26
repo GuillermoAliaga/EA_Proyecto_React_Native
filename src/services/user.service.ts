@@ -1,5 +1,6 @@
 import type { PaginatedResponse, User, UserInput, UserRole } from '../models';
 import { apiClient } from './apiClient';
+import { normalizePage } from './pagination';
 
 export interface UserListParams {
   page?: number;
@@ -23,7 +24,7 @@ export async function getUsers(
   params: UserListParams = {},
   signal?: AbortSignal,
 ): Promise<PaginatedResponse<User>> {
-  const response = await apiClient<PaginatedResponse<User>>('/users', {
+  const response = await apiClient<unknown>('/users', {
     params: {
       page: params.page,
       limit: params.limit,
@@ -36,7 +37,7 @@ export async function getUsers(
     },
     signal,
   });
-  return response ?? { data: [], totalDocs: 0, totalPages: 0, currentPage: params.page ?? 1 };
+  return normalizePage<User>(response, ['users', 'items', 'results'], params.page, params.limit);
 }
 
 export async function getUser(id: string, signal?: AbortSignal): Promise<User> {
