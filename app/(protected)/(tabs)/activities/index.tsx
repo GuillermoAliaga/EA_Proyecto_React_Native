@@ -1,16 +1,17 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Alert, FlatList, RefreshControl, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, FlatList, Pressable, RefreshControl, StyleSheet, Switch, Text, View } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import { router, useLocalSearchParams } from 'expo-router';
-import { ActivityCard } from '../../../src/components/domain/ActivityCard';
-import { Header } from '../../../src/components/layout/Header';
-import { ScreenWrapper } from '../../../src/components/layout/ScreenWrapper';
-import { AppButton } from '../../../src/components/ui/AppButton';
-import { AppInput } from '../../../src/components/ui/AppInput';
-import { EmptyView, ErrorView, LoadingView } from '../../../src/components/ui/StateViews';
-import { useAuth } from '../../../src/context/AuthContext';
-import { useDebounce } from '../../../src/hooks/useDebounce';
-import type { Activity, ActivityStatus } from '../../../src/models';
+import { ActivityCard } from '../../../../src/components/domain/ActivityCard';
+import { ActivitiesMap } from '../../../../src/components/domain/ActivitiesMap';
+import { Header } from '../../../../src/components/layout/Header';
+import { ScreenWrapper } from '../../../../src/components/layout/ScreenWrapper';
+import { AppButton } from '../../../../src/components/ui/AppButton';
+import { AppInput } from '../../../../src/components/ui/AppInput';
+import { EmptyView, ErrorView, LoadingView } from '../../../../src/components/ui/StateViews';
+import { useAuth } from '../../../../src/context/AuthContext';
+import { useDebounce } from '../../../../src/hooks/useDebounce';
+import type { Activity, ActivityStatus } from '../../../../src/models';
 import {
   bulkDeleteActivities,
   bulkSoftDeleteActivities,
@@ -20,14 +21,16 @@ import {
   leaveActivity,
   restoreActivity,
   softDeleteActivity,
-} from '../../../src/services/activity.service';
-import { getCategories } from '../../../src/services/category.service';
-import type { CategoryOption } from '../../../src/services/category.service';
-import { useToast } from '../../../src/context/ToastContext';
-import { useTheme } from '../../../src/context/ThemeContext';
+} from '../../../../src/services/activity.service';
+import { getCategories } from '../../../../src/services/category.service';
+import type { CategoryOption } from '../../../../src/services/category.service';
+import { useToast } from '../../../../src/context/ToastContext';
+import { useTheme } from '../../../../src/context/ThemeContext';
+import { categoryLabel, subcategoryLabel } from '../../../../src/utils/category-labels';
 
 const PAGE_SIZE = 8;
 const ACTIVITY_STATUSES: ActivityStatus[] = ['OPEN', 'FULL', 'COMPLETED', 'CANCELLED'];
+type ActivitiesView = 'list' | 'map';
 
 type RouteParams = {
   search?: string | string[];
@@ -73,6 +76,7 @@ export default function ActivitiesScreen() {
   const [reloadKey, setReloadKey] = useState(0);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [view, setView] = useState<ActivitiesView>('list');
 
   useEffect(() => setSearchText(search), [search]);
 
@@ -197,14 +201,32 @@ export default function ActivitiesScreen() {
   };
 
   const selectedCategory = categories.find((item) => item.slug === category);
+  const toggleParticipation = (activity: Activity) => {
+    const enrolled = activity.participants.some(
+      (participant) => participant.userId === user?._id,
+    );
+    if (enrolled) {
+      void runMutation(
+        activity._id,
+        () => leaveActivity(activity._id, role),
+        'Te has desapuntado de la actividad.',
+      );
+    } else {
+      void runMutation(
+        activity._id,
+        () => joinActivity(activity._id),
+        'Te has inscrito en la actividad.',
+      );
+    }
+  };
 
-  return (
-    <ScreenWrapper>
+  const listHeader = (
+    <View style={styles.headerBlock}>
       <Header title="Actividades" />
       {canCreate ? (
         <AppButton
           title="+ Nueva Actividad"
-          onPress={() => router.push('/(protected)/activities/new')}
+          onPress={() => router.push('/activities/new')}
         />
       ) : null}
       <AppInput
@@ -229,7 +251,7 @@ export default function ActivitiesScreen() {
           >
             <Picker.Item label="Todas las categorías" value="" />
             {categories.map((item) => (
-              <Picker.Item key={item.slug} label={item.name} value={item.slug} />
+              <Picker.Item key={item.slug} label={categoryLabel(item.slug, item.name)} value={item.slug} />
             ))}
           </Picker>
         </View>
@@ -264,10 +286,50 @@ export default function ActivitiesScreen() {
           >
             <Picker.Item label="Todas las subcategorías" value="" />
             {selectedCategory.subcategories.map((item) => (
-              <Picker.Item key={item.slug} label={item.name} value={item.slug} />
+              <Picker.Item key={item.slug} label={subcategoryLabel(item.slug, item.name)} value={item.slug} />
             ))}
           </Picker>
         </View>
+      ) : null}
+      <View style={[styles.viewToggle, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+        {(['list', 'map'] as const).map((nextView) => {
+          const selected = view === nextView;
+          return (
+            <Pressable
+              key={nextView}
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              onPress={() => setView(nextView)}
+              style={[
+                styles.viewOption,
+                selected && { backgroundColor: colors.primary },
+              ]}
+            >
+              <Text style={{ color: selected ? colors.surface : colors.text }}>
+                {nextView === 'list' ? 'Lista' : 'Mapa'}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      {view === 'map' ? (
+        error && !loading ? (
+          <ErrorView
+            title="No se pudieron cargar las actividades"
+            description={error}
+            onRetry={() => setReloadKey((key) => key + 1)}
+          />
+        ) : loading && activities.length === 0 ? (
+          <LoadingView title="Cargando actividades..." />
+        ) : (
+          <ActivitiesMap
+            activities={activities}
+            userId={user?._id}
+            role={role}
+            busyId={busyId}
+            onToggleParticipation={toggleParticipation}
+          />
+        )
       ) : null}
       {isAdmin ? (
         <View style={styles.switchRow}>
@@ -309,93 +371,114 @@ export default function ActivitiesScreen() {
           />
         </View>
       ) : null}
+    </View>
+  );
 
-      {error && !loading ? (
-        <ErrorView title="No se pudieron cargar las actividades" description={error} onRetry={() => setReloadKey((key) => key + 1)} />
-      ) : loading && activities.length === 0 ? (
-        <LoadingView title="Cargando actividades..." />
-      ) : (
-        <FlatList
-          style={styles.list}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={loading}
-              onRefresh={() => setReloadKey((key) => key + 1)}
-              tintColor={colors.primary}
+  return (
+    <ScreenWrapper>
+      <FlatList
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={() => setReloadKey((key) => key + 1)}
+            tintColor={colors.primary}
+          />
+        }
+        data={view === 'map' || error || (loading && activities.length === 0) ? [] : activities}
+        keyExtractor={(item) => item._id}
+        ListHeaderComponent={listHeader}
+        renderItem={({ item }) => (
+          <ActivityCard
+            activity={item}
+            role={role}
+            userId={user?._id}
+            selected={selectedIds.includes(item._id)}
+            busy={busyId === item._id}
+            onSelect={() => toggleSelected(item._id)}
+            onJoin={() =>
+              void runMutation(
+                item._id,
+                () => joinActivity(item._id),
+                'Te has inscrito en la actividad.',
+              )
+            }
+            onLeave={() =>
+              void runMutation(
+                item._id,
+                () => leaveActivity(item._id, role),
+                'Te has desapuntado de la actividad.',
+              )
+            }
+            onEdit={() =>
+              router.push({
+                pathname: '/(protected)/activities/[id]/edit',
+                params: { id: item._id },
+              })
+            }
+            onArchive={() =>
+              confirmAction(
+                'Archivar actividad',
+                `¿Archivar «${item.title}»?`,
+                () =>
+                  void runMutation(
+                    item._id,
+                    () => softDeleteActivity(item._id),
+                    'Actividad archivada.',
+                  ),
+              )
+            }
+            onRestore={() =>
+              void runMutation(
+                item._id,
+                () => restoreActivity(item._id),
+                'Actividad restaurada.',
+              )
+            }
+            onDelete={() =>
+              confirmAction(
+                'Eliminar actividad',
+                `¿Eliminar definitivamente «${item.title}»? Esta acción no se puede deshacer.`,
+                () =>
+                  void runMutation(
+                    item._id,
+                    () => deleteActivity(item._id),
+                    'Actividad eliminada.',
+                  ),
+              )
+            }
+            onReport={(() => {
+              const creatorId = typeof item.creatorId === 'string' ? item.creatorId : item.creatorId?._id;
+              return !item.deleted && user?._id !== creatorId
+                ? () => router.push({
+                    pathname: '/(protected)/(tabs)/reports/new',
+                    params: { targetType: 'ACTIVITY', targetId: item._id, title: item.title },
+                  })
+                : undefined;
+            })()}
+          />
+        )}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ListEmptyComponent={
+          view === 'map' ? undefined : error && !loading ? (
+            <ErrorView
+              title="No se pudieron cargar las actividades"
+              description={error}
+              onRetry={() => setReloadKey((key) => key + 1)}
             />
-          }
-          data={activities}
-          keyExtractor={(item) => item._id}
-          renderItem={({ item }) => (
-            <ActivityCard
-              activity={item}
-              role={role}
-              userId={user?._id}
-              selected={selectedIds.includes(item._id)}
-              busy={busyId === item._id}
-              onSelect={() => toggleSelected(item._id)}
-              onJoin={() =>
-                void runMutation(
-                  item._id,
-                  () => joinActivity(item._id),
-                  'Te has inscrito en la actividad.',
-                )
-              }
-              onLeave={() =>
-                void runMutation(
-                  item._id,
-                  () => leaveActivity(item._id, role),
-                  'Te has desapuntado de la actividad.',
-                )
-              }
-              onEdit={() =>
-                router.push({
-                  pathname: '/(protected)/activities/[id]/edit',
-                  params: { id: item._id },
-                })
-              }
-              onArchive={() =>
-                confirmAction(
-                  'Archivar actividad',
-                  `¿Archivar «${item.title}»?`,
-                  () =>
-                    void runMutation(
-                      item._id,
-                      () => softDeleteActivity(item._id),
-                      'Actividad archivada.',
-                    ),
-                )
-              }
-              onRestore={() =>
-                void runMutation(
-                  item._id,
-                  () => restoreActivity(item._id),
-                  'Actividad restaurada.',
-                )
-              }
-              onDelete={() =>
-                confirmAction(
-                  'Eliminar actividad',
-                  `¿Eliminar definitivamente «${item.title}»? Esta acción no se puede deshacer.`,
-                  () =>
-                    void runMutation(
-                      item._id,
-                      () => deleteActivity(item._id),
-                      'Actividad eliminada.',
-                    ),
-                )
-              }
-            />
-          )}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          ListEmptyComponent={
+          ) : loading ? (
+            <LoadingView title="Cargando actividades..." />
+          ) : (
             <EmptyView
               title="No hay actividades"
               description="Prueba a cambiar los filtros o crea una nueva actividad."
             />
-          }
-          ListFooterComponent={
+          )
+        }
+        ListFooterComponent={
+          activities.length > 0 ? (
             <View style={styles.pagination}>
               <AppButton
                 title="Anterior"
@@ -413,15 +496,30 @@ export default function ActivitiesScreen() {
                 onPress={() => router.setParams({ page: String(page + 1) })}
               />
             </View>
-          }
-        />
-      )}
+          ) : undefined
+        }
+      />
     </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
+  headerBlock: { gap: 12, marginBottom: 12 },
   filters: { flexDirection: 'row', gap: 8 },
+  viewToggle: {
+    flexDirection: 'row',
+    alignSelf: 'flex-start',
+    padding: 3,
+    borderWidth: 1,
+    borderRadius: 10,
+  },
+  viewOption: {
+    minWidth: 72,
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 7,
+  },
   pickerWrap: {
     flex: 1,
     minHeight: 48,
@@ -436,7 +534,7 @@ const styles = StyleSheet.create({
   bulkActions: { gap: 8 },
   selectedLabel: { fontWeight: '600' },
   list: { flex: 1 },
-  listContent: { flexGrow: 1, paddingBottom: 16 },
+  listContent: { flexGrow: 1, paddingBottom: 24 },
   separator: { height: 12 },
   pagination: {
     flexDirection: 'row',
