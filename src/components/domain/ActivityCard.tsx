@@ -4,6 +4,7 @@ import { useTheme } from '../../context/ThemeContext';
 import { AppBadge } from '../ui/AppBadge';
 import { AppButton } from '../ui/AppButton';
 import { AppCard } from '../ui/AppCard';
+import { categoryLabel, subcategoryLabel } from '../../utils/category-labels';
 
 interface ActivityCardProps {
   activity: Activity;
@@ -18,6 +19,7 @@ interface ActivityCardProps {
   onArchive?: () => void;
   onRestore?: () => void;
   onDelete?: () => void;
+  onReport?: () => void;
 }
 
 function formatPrice(price: number): string {
@@ -31,14 +33,15 @@ function formatSchedule(startTime: string, endTime: string): string {
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return 'Fecha por confirmar';
 
   const date = new Intl.DateTimeFormat('es-ES', {
-    dateStyle: 'medium',
+    day: '2-digit',
+    month: 'short',
     timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
   }).format(start);
   const times = new Intl.DateTimeFormat('es-ES', {
     hour: '2-digit',
     minute: '2-digit',
   });
-  return `${date}, ${times.format(start)}–${times.format(end)}`;
+  return `${date} · ${times.format(start)}–${times.format(end)}`;
 }
 
 function truncate(text: string, length = 140): string {
@@ -58,6 +61,7 @@ export function ActivityCard({
   onArchive,
   onRestore,
   onDelete,
+  onReport,
 }: ActivityCardProps) {
   const { colors } = useTheme();
   const maxParticipants = activity.capacity.maxParticipants;
@@ -90,14 +94,18 @@ export function ActivityCard({
       </View>
 
       <View style={styles.badges}>
-        <AppBadge label={activity.category} />
-        <AppBadge label={activity.subcategory} />
+        <AppBadge label={categoryLabel(activity.category)} />
+        <AppBadge label={subcategoryLabel(activity.subcategory)} />
         <AppBadge label={activity.modality} />
       </View>
 
       <Text style={[styles.description, { color: colors.text }]}>{truncate(activity.description)}</Text>
       <Text style={[styles.detail, { color: colors.textSecondary }]}>{activity.location.addressName}</Text>
-      <Text style={[styles.detail, { color: colors.textSecondary }]}>
+      <Text
+        numberOfLines={1}
+        ellipsizeMode="tail"
+        style={[styles.schedule, { color: colors.textSecondary }]}
+      >
         {formatSchedule(activity.schedule.startTime, activity.schedule.endTime)}
       </Text>
       <View style={styles.meta}>
@@ -115,6 +123,10 @@ export function ActivityCard({
         )
       ) : role === 'USER' && hasOpenSpots ? (
         <AppButton title="Inscribirse" onPress={onJoin} loading={busy} disabled={busy} />
+      ) : null}
+
+      {onReport && !activity.deleted ? (
+        <AppButton title="Denunciar actividad" variant="ghost" onPress={onReport} />
       ) : null}
 
       {role === 'ADMIN' ? (
@@ -150,6 +162,7 @@ const styles = StyleSheet.create({
   badges: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   description: { fontSize: 14, lineHeight: 20 },
   detail: { fontSize: 13 },
+  schedule: { flexShrink: 1, fontSize: 13 },
   meta: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   price: { fontSize: 15, fontWeight: '700' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },

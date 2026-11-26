@@ -4,6 +4,7 @@ import MapView, { Callout, Marker, Polyline } from 'react-native-maps';
 import type { Activity, UserRole } from '../../models';
 import { useTheme } from '../../context/ThemeContext';
 import { AppCard } from '../ui/AppCard';
+import { categoryLabel, subcategoryLabel } from '../../utils/category-labels';
 
 interface ActivitiesMapProps {
   activities: Activity[];
@@ -139,7 +140,7 @@ export function ActivitiesMap({
               >
                 <View style={styles.callout}>
                   <Text style={[styles.category, { color: colors.textSecondary }]}>
-                    {activity.category} · {activity.subcategory}
+                    {categoryLabel(activity.category)} · {subcategoryLabel(activity.subcategory)}
                     {activity.location.isStoreLocation ? ' · Tienda oficial' : ''}
                   </Text>
                   <Text style={[styles.title, { color: colors.text }]}>{activity.title}</Text>
