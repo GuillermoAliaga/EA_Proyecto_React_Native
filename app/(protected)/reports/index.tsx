@@ -26,7 +26,7 @@ import {
   softDeleteReport,
 } from '../../../src/services/report.service';
 
-const PAGE_SIZE = 10;
+const PAGE_SIZE = 20;
 
 type RouteParams = {
   search?: string | string[];
@@ -69,6 +69,7 @@ export default function ReportsScreen() {
   const [searchText, setSearchText] = useState(search);
   const debouncedSearch = useDebounce(searchText, 400);
   const [reports, setReports] = useState<Report[]>([]);
+  const [totalReports, setTotalReports] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -102,12 +103,15 @@ export default function ReportsScreen() {
     setError(null);
     void getReports(query, controller.signal)
       .then((result) => {
-        setReports(result.data);
-        setTotalPages(result.totalPages);
+        const list = Array.isArray(result) ? result : (result?.data ?? []);
+        setReports(list);
+        setTotalReports(result?.totalDocs ?? list.length);
+        setTotalPages(result?.totalPages ?? (list.length > 0 ? 1 : 0));
       })
       .catch((requestError: unknown) => {
         if (!controller.signal.aborted) {
           setReports([]);
+          setTotalReports(0);
           setTotalPages(0);
           setError(requestError instanceof Error ? requestError.message : 'No se pudieron cargar las denuncias.');
         }
@@ -167,13 +171,13 @@ export default function ReportsScreen() {
 
   if (!isAdmin) return <LoadingView />;
 
-  return (
-    <ScreenWrapper>
-      <Header title="Gestión de denuncias" />
+  const listHeader = (
+    <View style={styles.headerBlock}>
+      <Header title="Gestión de denuncias" subtitle={`${totalReports} denuncias registradas`} />
       <AppButton
         title="+ Nueva denuncia"
         variant="secondary"
-        onPress={() => router.push('/(protected)/reports/new')}
+        onPress={() => router.push('/reports/new')}
       />
       <AppInput
         label="Buscar denuncias"
@@ -260,65 +264,77 @@ export default function ReportsScreen() {
           />
         </View>
       ) : null}
-      {error && !loading ? (
-        <ErrorView
-          title="No se pudieron cargar las denuncias"
-          description={error}
-          onRetry={() => setReloadKey((key) => key + 1)}
-        />
-      ) : loading && reports.length === 0 ? (
-        <LoadingView title="Cargando denuncias..." />
-      ) : (
-        <FlatList
-          style={styles.list}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={loading}
-              onRefresh={() => setReloadKey((key) => key + 1)}
-              tintColor={colors.primary}
+    </View>
+  );
+
+  return (
+    <ScreenWrapper>
+      <FlatList
+        style={styles.list}
+        contentContainerStyle={styles.listContent}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={loading}
+            onRefresh={() => setReloadKey((key) => key + 1)}
+            tintColor={colors.primary}
+          />
+        }
+        data={error || (loading && reports.length === 0) ? [] : reports}
+        keyExtractor={(item) => item._id}
+        ListHeaderComponent={listHeader}
+        renderItem={({ item }) => (
+          <ReportCard
+            report={item}
+            selected={selectedIds.includes(item._id)}
+            busy={busyId === item._id}
+            onSelect={() => toggleSelected(item._id)}
+            onReview={() => router.push({
+              pathname: '/reports/[id]/edit',
+              params: { id: item._id },
+            })}
+            onArchive={!item.deleted ? () => confirmAction(
+              'Archivar denuncia',
+              '¿Archivar esta denuncia?',
+              () => void runMutation(item._id, () => softDeleteReport(item._id), 'Denuncia archivada.'),
+            ) : undefined}
+            onDelete={() => confirmAction(
+              'Eliminar denuncia',
+              '¿Eliminar definitivamente esta denuncia? Esta acción no se puede deshacer.',
+              () => void runMutation(item._id, () => deleteReport(item._id), 'Denuncia eliminada.'),
+            )}
+          />
+        )}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ListEmptyComponent={
+          error && !loading ? (
+            <ErrorView
+              title="No se pudieron cargar las denuncias"
+              description={error}
+              onRetry={() => setReloadKey((key) => key + 1)}
             />
-          }
-          data={reports}
-          keyExtractor={(item) => item._id}
-          renderItem={({ item }) => (
-            <ReportCard
-              report={item}
-              selected={selectedIds.includes(item._id)}
-              busy={busyId === item._id}
-              onSelect={() => toggleSelected(item._id)}
-              onReview={() => router.push({
-                pathname: '/(protected)/reports/[id]/edit',
-                params: { id: item._id },
-              })}
-              onArchive={!item.deleted ? () => confirmAction(
-                'Archivar denuncia',
-                '¿Archivar esta denuncia?',
-                () => void runMutation(item._id, () => softDeleteReport(item._id), 'Denuncia archivada.'),
-              ) : undefined}
-              onDelete={() => confirmAction(
-                'Eliminar denuncia',
-                '¿Eliminar definitivamente esta denuncia? Esta acción no se puede deshacer.',
-                () => void runMutation(item._id, () => deleteReport(item._id), 'Denuncia eliminada.'),
-              )}
-            />
-          )}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          ListEmptyComponent={<EmptyView title="No hay denuncias" description="No hay resultados para los filtros seleccionados." />}
-          ListFooterComponent={
+          ) : loading ? (
+            <LoadingView title="Cargando denuncias..." />
+          ) : (
+            <EmptyView title="No hay denuncias" description="No hay resultados para los filtros seleccionados." />
+          )
+        }
+        ListFooterComponent={
+          reports.length > 0 ? (
             <View style={styles.pagination}>
               <AppButton title="Anterior" variant="secondary" disabled={page <= 1} onPress={() => router.setParams({ page: String(page - 1) })} />
               <Text style={[styles.pageLabel, { color: colors.textSecondary }]}>Página {page} de {Math.max(totalPages, 1)}</Text>
               <AppButton title="Siguiente" variant="secondary" disabled={totalPages === 0 || page >= totalPages} onPress={() => router.setParams({ page: String(page + 1) })} />
             </View>
-          }
-        />
-      )}
+          ) : undefined
+        }
+      />
     </ScreenWrapper>
   );
 }
 
 const styles = StyleSheet.create({
+  headerBlock: { gap: 12, marginBottom: 12 },
   filters: { flexDirection: 'row', gap: 8 },
   pickerWrap: {
     flex: 1,
@@ -333,7 +349,7 @@ const styles = StyleSheet.create({
   bulkActions: { gap: 8 },
   selectedLabel: { fontWeight: '600' },
   list: { flex: 1 },
-  listContent: { flexGrow: 1, paddingBottom: 16 },
+  listContent: { flexGrow: 1, paddingBottom: 24 },
   separator: { height: 12 },
   pagination: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, paddingVertical: 16 },
   pageLabel: { fontSize: 13 },
