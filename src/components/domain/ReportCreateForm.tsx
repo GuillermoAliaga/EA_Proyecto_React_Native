@@ -19,14 +19,16 @@ function firstParam(value: string | string[] | undefined): string {
 }
 
 export function ReportCreateForm() {
-  const params = useLocalSearchParams<{ targetType?: string | string[]; targetId?: string | string[] }>();
+  const params = useLocalSearchParams<{ targetType?: string | string[]; targetId?: string | string[]; title?: string | string[] }>();
   const initialTargetType = firstParam(params.targetType);
+  const presetTitle = firstParam(params.title);
   const { colors } = useTheme();
   const { showToast } = useToast();
   const [targetType, setTargetType] = useState<TargetType>(
     TARGET_TYPES.includes(initialTargetType as TargetType) ? (initialTargetType as TargetType) : 'ACTIVITY',
   );
   const [targetId, setTargetId] = useState(firstParam(params.targetId));
+  const hasPresetActivity = initialTargetType === 'ACTIVITY' && OBJECT_ID_PATTERN.test(firstParam(params.targetId));
   const [reason, setReason] = useState<ReportReason>(REPORT_REASONS[0]);
   const [description, setDescription] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -55,7 +57,7 @@ export function ReportCreateForm() {
     try {
       await createReport(payload);
       showToast('Denuncia enviada correctamente.');
-      router.replace('/(protected)');
+      router.replace('/(protected)/(tabs)/activities');
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'No se pudo enviar la denuncia.');
     } finally {
@@ -66,21 +68,24 @@ export function ReportCreateForm() {
   return (
     <ScreenWrapper scroll>
       <Header title="Nueva denuncia" subtitle="Describe el contenido que quieres reportar." />
-      <View style={styles.field}>
+      {hasPresetActivity ? (
+        <Text style={[styles.selectedActivity, { color: colors.text }]}>Actividad denunciada: {presetTitle || 'Actividad seleccionada'}</Text>
+      ) : null}
+      {!hasPresetActivity ? <View style={styles.field}>
         <Text style={[styles.label, { color: colors.text }]}>Tipo de objetivo</Text>
         <View style={[styles.pickerWrap, { borderColor: colors.border, backgroundColor: colors.surface }]}>
           <Picker style={{ color: colors.text }} selectedValue={targetType} onValueChange={(value: TargetType) => setTargetType(value)}>
             {TARGET_TYPES.map((type) => <Picker.Item key={type} label={type} value={type} />)}
           </Picker>
         </View>
-      </View>
-      <AppInput
+      </View> : null}
+      {!hasPresetActivity ? <AppInput
         label="Identificador del objetivo"
         value={targetId}
         onChangeText={setTargetId}
         autoCapitalize="none"
         placeholder="ID del usuario o actividad"
-      />
+      /> : null}
       <View style={styles.field}>
         <Text style={[styles.label, { color: colors.text }]}>Motivo</Text>
         <View style={[styles.pickerWrap, { borderColor: colors.border, backgroundColor: colors.surface }]}>
@@ -114,6 +119,7 @@ export function ReportCreateForm() {
 }
 
 const styles = StyleSheet.create({
+  selectedActivity: { fontSize: 15, fontWeight: '600' },
   field: { gap: 6 },
   label: { fontSize: 14, fontWeight: '600' },
   pickerWrap: {

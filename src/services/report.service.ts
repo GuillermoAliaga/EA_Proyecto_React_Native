@@ -8,6 +8,7 @@ import type {
   ReportTargetType,
 } from '../models';
 import { apiClient } from './apiClient';
+import { normalizePage } from './pagination';
 
 export interface ReportListParams {
   page?: number;
@@ -32,7 +33,7 @@ export async function getReports(
   params: ReportListParams = {},
   signal?: AbortSignal,
 ): Promise<PaginatedResponse<Report>> {
-  const response = await apiClient<PaginatedResponse<Report>>('/reports', {
+  const response = await apiClient<unknown>('/reports', {
     params: {
       page: params.page,
       limit: params.limit,
@@ -46,7 +47,7 @@ export async function getReports(
     },
     signal,
   });
-  return response ?? { data: [], totalDocs: 0, totalPages: 0, currentPage: params.page ?? 1 };
+  return normalizePage<Report>(response, ['reports', 'items', 'results'], params.page, params.limit);
 }
 
 export async function getReport(id: string, signal?: AbortSignal): Promise<Report> {
