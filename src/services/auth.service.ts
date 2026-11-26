@@ -77,6 +77,11 @@ export async function restoreSession(): Promise<User | null> {
       await clearSessionTokens();
       return null;
     }
+    // A new browser/app session may have no refresh token yet. If the local API
+    // is offline, continue to the login screen instead of blocking app startup.
+    if (error instanceof ApiError && error.status === 0 && !storedRefreshToken) {
+      return null;
+    }
     throw error;
   }
 }
